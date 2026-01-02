@@ -7,12 +7,16 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
     const {
-      apiKey,
       historicalData,
       horizon,
       horizonUnit,
       units
     } = body;
+
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) {
+      return NextResponse.json({ error: "Server configuration error: API Key missing" }, { status: 500 });
+    }
 
     if (!historicalData || !Array.isArray(historicalData)) {
       return NextResponse.json({ error: "Invalid historical data" }, { status: 400 });
