@@ -4,6 +4,11 @@ export interface ForecastResult {
   forecast: { timestamp: string; load: number }[];
   analysis: string;
   recommendations: string;
+  expansion: {
+    timeframe: string;
+    capacityNeededMW: number;
+    reasoning: string;
+  };
 }
 
 export async function generateForecast(
@@ -29,7 +34,10 @@ export async function generateForecast(
   // Construct prompt
   const prompt = `
     You are an expert electrical load forecasting system.
-    Task: Forecast the electrical load for the next ${horizon} ${horizonUnit} and provide expert analysis.
+    Task:
+    1. Forecast the electrical load for the next ${horizon} ${horizonUnit}.
+    2. Provide expert analysis and operational recommendations.
+    3. Analyze long-term trends to predict Future Expansion needs (when new generation capacity will be required).
 
     Historical Load Data (Chronological):
     ${dataStr}
@@ -37,13 +45,19 @@ export async function generateForecast(
     Instructions:
     1. Analyze the trend and seasonality in the provided data.
     2. Predict the load values for the next ${horizon} ${horizonUnit} starting after the last provided timestamp.
-    3. Return ONLY a valid JSON object with this exact structure:
+    3. For "expansion", estimate based on the growth trend when the grid might need more capacity (e.g., "6-12 months", "2 years"). If trend is flat/decreasing, say "Not imminent".
+    4. Return ONLY a valid JSON object with this exact structure:
     {
       "forecast": [number, number, ...],
       "analysis": "Short text analyzing the trend (max 2 sentences)",
-      "recommendations": "Short text suggesting operational actions (max 2 sentences)"
+      "recommendations": "Short text suggesting operational actions (max 2 sentences)",
+      "expansion": {
+          "timeframe": "Estimated time until new capacity needed (e.g. '12-18 months')",
+          "capacityNeededMW": number (estimated MW needed, or 0 if none),
+          "reasoning": "Short explanation of growth trend"
+      }
     }
-    4. Do not include markdown formatting like \`\`\`json. Just the raw JSON object.
+    5. Do not include markdown formatting like \`\`\`json. Just the raw JSON object.
   `;
 
   try {
@@ -87,7 +101,8 @@ export async function generateForecast(
     return {
         forecast,
         analysis: parsed.analysis || "No analysis provided.",
-        recommendations: parsed.recommendations || "No recommendations provided."
+        recommendations: parsed.recommendations || "No recommendations provided.",
+        expansion: parsed.expansion || { timeframe: "Unknown", capacityNeededMW: 0, reasoning: "No data." }
     };
 
   } catch (error) {

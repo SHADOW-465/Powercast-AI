@@ -5,20 +5,22 @@ import SystemConfig from '@/components/SystemConfig';
 import ResultsChart from '@/components/ResultsChart';
 import StatusBoard from '@/components/StatusBoard';
 import AIInsights from '@/components/AIInsights';
+import FuturePlanning from '@/components/FuturePlanning';
 import { BarChart3, Zap, Sparkles } from 'lucide-react';
 
 export default function Home() {
   const [historicalData, setHistoricalData] = useState<any[]>([]);
   const [horizon, setHorizon] = useState(24);
+  const [horizonUnit, setHorizonUnit] = useState<'hours' | 'days'>('hours');
   const [lookback, setLookback] = useState(48);
   const [loading, setLoading] = useState(false);
   const [results, setResults] = useState<any>(null);
 
   // Default units (with stable IDs)
   const [units, setUnits] = useState([
-    { id: 'u1', name: 'Thermal Unit A', capacityMW: 2500, type: 'Capacity' },
+    { id: 'u1', name: 'Thermal Unit A', capacityMW: 2500, type: 'Thermal' },
     { id: 'u2', name: 'Hydro Unit B', capacityMW: 3500, type: 'Hydro' },
-    { id: 'u3', name: 'Gas Unit C', capacityMW: 3000, type: 'Capacity' },
+    { id: 'u3', name: 'Gas Unit C', capacityMW: 3000, type: 'Thermal' },
   ]);
 
   const handleRunForecast = async () => {
@@ -37,7 +39,7 @@ export default function Home() {
         body: JSON.stringify({
           historicalData,
           horizon,
-          horizonUnit: 'hours',
+          horizonUnit,
           units
         })
       });
@@ -65,6 +67,8 @@ export default function Home() {
                 dataCount={historicalData.length}
                 horizon={horizon}
                 setHorizon={setHorizon}
+                horizonUnit={horizonUnit}
+                setHorizonUnit={setHorizonUnit}
                 lookback={lookback}
                 setLookback={setLookback}
                 units={units}
@@ -75,13 +79,18 @@ export default function Home() {
        </div>
 
        {/* Main Content */}
-       <div className="w-full md:w-3/4 flex flex-col gap-6 h-full">
+       <div className="w-full md:w-3/4 flex flex-col gap-6 h-full overflow-y-auto pr-2 pb-10">
             <h1 className="text-xs font-bold tracking-wider text-slate-500 uppercase mb-2 ml-1">Forecasting & Decision Support</h1>
 
             {/* Chart Panel */}
-            <div className="flex-1 min-h-[420px]">
+            <div className="min-h-[420px]">
                 {results ? (
-                    <ResultsChart history={results.processedHistory} forecast={results.forecast} horizon={horizon} />
+                    <ResultsChart
+                        history={results.processedHistory}
+                        forecast={results.forecast}
+                        horizon={horizon}
+                        maintenanceWindows={results.maintenance}
+                    />
                 ) : (
                     <div className="neo-card w-full h-full p-6 flex flex-col">
                         <h2 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-4">Dynamic Load Forecast Visualization</h2>
@@ -95,8 +104,8 @@ export default function Home() {
                 )}
             </div>
 
-            {/* Bottom Panels */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 h-[380px]">
+            {/* Middle Panels: Unit Commitment & Future Planning */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 min-h-[380px]">
 
                 {/* Unit Commitment */}
                 <div className="h-full">
@@ -113,22 +122,28 @@ export default function Home() {
                      )}
                 </div>
 
-                {/* AI Insights */}
+                {/* Future Planning (New) */}
                 <div className="h-full">
-                     {results ? (
-                         <AIInsights analysis={results.analysis} recommendations={results.recommendations} />
-                     ) : (
-                         <div className="neo-card w-full h-full p-6 flex flex-col">
-                            <h2 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-4">AI Insights & Reasoning</h2>
-                            <div className="flex-1 flex flex-col items-center justify-center opacity-40">
-                                <Sparkles className="w-10 h-10 mb-3 text-slate-400" />
-                                <p className="text-sm font-medium text-slate-500">Gemini Engine Ready</p>
-                            </div>
-                         </div>
-                     )}
+                     <FuturePlanning expansion={results?.expansion} />
                 </div>
 
             </div>
+
+             {/* Bottom: AI Insights */}
+             <div className="min-h-[300px]">
+                 {results ? (
+                     <AIInsights analysis={results.analysis} recommendations={results.recommendations} />
+                 ) : (
+                     <div className="neo-card w-full h-full p-6 flex flex-col">
+                        <h2 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-4">AI Insights & Reasoning</h2>
+                        <div className="flex-1 flex flex-col items-center justify-center opacity-40">
+                            <Sparkles className="w-10 h-10 mb-3 text-slate-400" />
+                            <p className="text-sm font-medium text-slate-500">Gemini Engine Ready</p>
+                        </div>
+                     </div>
+                 )}
+            </div>
+
        </div>
     </main>
   );

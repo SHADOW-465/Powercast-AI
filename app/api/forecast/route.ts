@@ -42,11 +42,9 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: "Forecasting failed: " + error.message }, { status: 500 });
     }
 
-    const { forecast, analysis, recommendations } = aiResult;
+    const { forecast, analysis, recommendations, expansion } = aiResult;
 
     // 3. Decision Support
-    // Combine history (tail) + forecast for continuous view, or just forecast.
-    // Decision is usually on future steps.
     const forecastLoads = forecast.map(f => f.load);
     const forecastTimestamps = forecast.map(f => f.timestamp);
 
@@ -54,10 +52,11 @@ export async function POST(req: NextRequest) {
     const maintenance = suggestMaintenance(forecastLoads, forecastTimestamps);
 
     return NextResponse.json({
-      processedHistory, // Return smoothed data for plotting
+      processedHistory,
       forecast,
       analysis,
       recommendations,
+      expansion,
       unitCommitment,
       maintenance
     });
