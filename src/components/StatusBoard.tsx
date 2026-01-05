@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react';
 import { Zap, Settings, Calendar } from 'lucide-react';
 
 interface StatusBoardProps {
@@ -7,11 +8,29 @@ interface StatusBoardProps {
 }
 
 export default function StatusBoard({ unitCommitment, maintenance, units }: StatusBoardProps) {
-  // Use first step of forecast for status
-  const currentStatus = unitCommitment[0] || { unitsOn: [], unitsOff: [] };
+  // Local state to track overrides.
+  // We initialize based on the FIRST step of the forecast (recommendation).
+  const [manualStatus, setManualStatus] = useState<Record<string, boolean>>({});
 
-  // Helper to check if unit is ON
-  const isUnitOn = (unitName: string) => currentStatus.unitsOn.includes(unitName);
+  useEffect(() => {
+    // When new forecast arrives, reset/update the manual status to match recommendations
+    const currentStatus = unitCommitment[0] || { unitsOn: [], unitsOff: [] };
+    const newStatus: Record<string, boolean> = {};
+
+    units.forEach(u => {
+        // If we previously had no state, or if we want to reset on new run:
+        // Let's reset to recommended state on every new forecast run
+        newStatus[u.name] = currentStatus.unitsOn.includes(u.name);
+    });
+    setManualStatus(newStatus);
+  }, [unitCommitment, units]);
+
+  const toggleUnit = (unitName: string) => {
+      setManualStatus(prev => ({
+          ...prev,
+          [unitName]: !prev[unitName]
+      }));
+  };
 
   return (
     <div className="neo-card w-full h-full p-6 flex flex-col overflow-hidden">
@@ -20,12 +39,14 @@ export default function StatusBoard({ unitCommitment, maintenance, units }: Stat
       {/* Unit List with Toggles */}
       <div className="flex-1 overflow-y-auto pr-2 space-y-4 mb-4">
           {units.map((unit) => {
-              const isOn = isUnitOn(unit.name);
+              // Default to false if not yet set
+              const isOn = manualStatus[unit.name] ?? false;
+
               return (
                 <div key={unit.id} className="flex items-center justify-between group">
                     <div className="flex items-center gap-3">
-                        <div className="w-6 h-6 rounded flex items-center justify-center text-slate-300">
-                             ::: {/* Drag handle look */}
+                        <div className="w-6 h-6 rounded flex items-center justify-center text-slate-300 cursor-move">
+                             :::
                         </div>
                         <span className={`text-sm font-bold transition-colors ${isOn ? 'text-slate-700' : 'text-slate-400'}`}>
                             {unit.name}
@@ -33,15 +54,18 @@ export default function StatusBoard({ unitCommitment, maintenance, units }: Stat
                     </div>
 
                     <div className="flex items-center gap-4">
-                        {/* Neomorphic Toggle */}
-                        <div className={`relative w-12 h-6 rounded-full transition-colors duration-300 ${isOn ? 'bg-blue-100' : 'bg-[#e6e9ef]' } neo-inset`}>
+                        {/* Interactive Neomorphic Toggle */}
+                        <div
+                            onClick={() => toggleUnit(unit.name)}
+                            className={`relative w-12 h-6 rounded-full transition-colors duration-300 cursor-pointer ${isOn ? 'bg-blue-100' : 'bg-[#e6e9ef]' } neo-inset`}
+                        >
                             <div className={`absolute top-1 w-4 h-4 rounded-full shadow-md transform transition-transform duration-300 ${isOn ? 'translate-x-7 bg-blue-500' : 'translate-x-1 bg-slate-400'}`}></div>
                         </div>
 
-                        <div className="w-8 h-8 rounded-full neo-card flex items-center justify-center text-slate-400 hover:text-blue-500 cursor-pointer">
-                            <Zap className="w-4 h-4" />
+                        <div className="w-8 h-8 rounded-full neo-card flex items-center justify-center text-slate-400 hover:text-blue-500 cursor-pointer active:scale-95 transition-transform">
+                            <Zap className={`w-4 h-4 ${isOn ? 'fill-current' : ''}`} />
                         </div>
-                        <div className="w-8 h-8 rounded-full neo-card flex items-center justify-center text-slate-400 hover:text-blue-500 cursor-pointer">
+                        <div className="w-8 h-8 rounded-full neo-card flex items-center justify-center text-slate-400 hover:text-blue-500 cursor-pointer active:scale-95 transition-transform">
                             <Settings className="w-4 h-4" />
                         </div>
                     </div>
@@ -54,26 +78,13 @@ export default function StatusBoard({ unitCommitment, maintenance, units }: Stat
       <div className="mt-auto border-t border-slate-200 pt-4">
            <h3 className="text-[10px] font-bold text-slate-400 uppercase mb-2">Optimal Maintenance Periods</h3>
            <div className="space-y-2">
-               {maintenance.length > 0 ? maintenance.slice(0, 3).map((m: any, i: number) => (
+               {maintenance && maintenance.length > 0 ? maintenance.slice(0, 3).map((m: any, i: number) => (
                    <div key={i} className="flex items-center gap-2 text-xs text-slate-600">
                        <div className="w-1.5 h-1.5 rounded-full bg-slate-400"></div>
-                       <span>{m.startTimestamp.split(' ')[0]} - {m.endTimestamp.split(' ')[0]}</span>
+                       <span>{m.startTimestamp ? m.startTimestamp.split(' ')[0] : 'N/A'} - {m.endTimestamp ? m.endTimestamp.split(' ')[0] : 'N/A'}</span>
                    </div>
                )) : (
                    <div className="text-xs text-slate-400 italic">No immediate maintenance windows identified.</div>
-               )}
-               {/* Dummy placeholders to match mockup density if needed */}
-               {maintenance.length === 0 && (
-                   <>
-                    <div className="flex items-center gap-2 text-xs text-slate-300">
-                       <div className="w-1.5 h-1.5 rounded-full bg-slate-200"></div>
-                       <span>02/09/202X - 10/03/202X</span>
-                    </div>
-                    <div className="flex items-center gap-2 text-xs text-slate-300">
-                       <div className="w-1.5 h-1.5 rounded-full bg-slate-200"></div>
-                       <span>06/04/202X - 08/05/202X</span>
-                    </div>
-                   </>
                )}
            </div>
       </div>
