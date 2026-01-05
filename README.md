@@ -1,77 +1,73 @@
-# PowerCast AI: Electrical Load Forecasting Application
+# PowerCast AI: Electrical Load Forecasting & Decision Support
 
-A comprehensive, AI-based electrical load forecasting and decision support system built with Next.js, Tailwind CSS, and Google Gemini AI.
+A professional, AI-driven dashboard for electrical load forecasting and power system decision support.
+This application leverages **Google Gemini** for time-series forecasting and intelligent reasoning, avoiding traditional local ML model training.
 
-## Overview
+## 🚀 Features
 
-PowerCast AI provides a modern dashboard for utility operators and planners to:
-1.  **Visualize** historical load data with Savitzky-Golay smoothing for trend analysis.
-2.  **Forecast** future electrical load (next hour to N days) using Generative AI (Google Gemini).
-3.  **Optimize** generation schedules with unit commitment recommendations.
-4.  **Plan** maintenance during identified low-load periods.
+- **No-Code AI Forecasting**: Uses Gemini API to predict future load based on historical patterns.
+- **Smart Preprocessing**: Applies **Savitzky-Golay smoothing** (Window=11, Poly=2) to noise-reduce data before analysis.
+- **Decision Support**:
+  - **Unit Commitment**: Suggests generator ON/OFF status based on predicted load and unit capacities.
+  - **Maintenance Planning**: Identifies low-load windows suitable for maintenance.
+- **Interactive Visualization**: Dynamic charts comparing historical, smoothed, and predicted data.
+- **Neomorphic UI**: Modern, clean, control-room style dashboard.
 
-## System Architecture
+## 🛠️ Tech Stack
 
-*   **Frontend**: Next.js 16 (App Router), Tailwind CSS v4, Lucide Icons, Recharts.
-*   **Backend**: Next.js API Routes (Serverless functions).
-*   **AI Engine**: Google Gemini 1.5 Flash (via Google Generative AI SDK).
-*   **Data Processing**: Savitzky-Golay filtering (custom implementation matching SciPy parameters), CSV parsing.
+- **Frontend**: Next.js 16 (App Router), React 19, Tailwind CSS 4, Recharts.
+- **Backend**: Next.js API Routes (Node.js).
+- **AI Engine**: Google Gemini API (`gemini-2.0-flash`).
+- **Data Processing**: Custom TypeScript implementations for signal processing.
 
-## Features
+## 📦 Installation & Setup
 
-*   **Data Input**: CSV file upload (timestamp, load) and manual parameter configuration.
-*   **Signal Processing**: Automatic noise reduction using Savitzky-Golay filter (Window=11, Poly=2).
-*   **Forecasting**: Flexible horizon (hours/days) driven by LLM context understanding.
-*   **Decision Support**:
-    *   **Unit Commitment**: Greedy algorithm to suggest optimal generator mix based on capacity.
-    *   **Maintenance Planning**: Algorithmic detection of low-load windows suitable for maintenance.
-*   **Visualization**: Interactive, responsive charts showing actual vs. smoothed vs. predicted load.
-
-## Getting Started
-
-### Prerequisites
-
-*   Node.js 20+
-*   Google Gemini API Key (Get one at [Google AI Studio](https://aistudio.google.com/))
-
-### Installation
-
-1.  Clone the repository.
-2.  Install dependencies:
+1.  **Clone the repository**
+2.  **Install dependencies**:
     ```bash
     npm install
     ```
-    *Note: This project uses modern versions of Next.js (16.x) and Tailwind (4.x). Ensure your environment supports them.*
+3.  **Configure Environment**:
+    Create a `.env.local` file in the root directory and add your Google Gemini API Key:
+    ```bash
+    GEMINI_API_KEY=your_api_key_here
+    ```
+4.  **Run the Application**:
+    ```bash
+    npm run dev
+    ```
+    Open [http://localhost:3000](http://localhost:3000) in your browser.
 
-### Configuration
+## 📖 Usage Guide
 
-Create a `.env.local` file in the root directory and add your API key:
+1.  **Upload Data**: Use the "Historical Data" upload box to select a CSV file.
+    - Format: `timestamp,load`
+    - Example:
+      ```csv
+      timestamp,load
+      2024-01-01 00:00,120.5
+      2024-01-01 01:00,118.2
+      ```
+2.  **Configure System**:
+    - Set the **Forecast Horizon** (e.g., 24 hours).
+    - Adjust **Generator Capacities** if needed.
+3.  **Run Analysis**: Click the "Run Analysis" button.
+4.  **View Results**:
+    - **Graph**: See the trend continuation.
+    - **Status Board**: Check which units should be running.
+    - **Maintenance**: See recommended maintenance times.
 
-```bash
-GEMINI_API_KEY=your_api_key_here
-```
+## 🧠 AI Strategy (Prompt Engineering)
 
-### Running the Application
+Instead of training a model (like LSTM), we use **In-Context Learning**:
+1.  **Context**: We feed the last 48 hours of *smoothed* historical data to Gemini.
+2.  **Prompt**: We instruct Gemini to act as a power systems expert, analyze seasonality/trends, and output a JSON array of future values.
+3.  **Reasoning**: The system implicitly uses the LLM's vast knowledge of time-series patterns to extrapolate the load curve.
 
-```bash
-npm run dev
-# Open http://localhost:3000
-```
+## 📂 Project Structure
 
-### Building for Production
-
-```bash
-npm run build
-npm start
-```
-
-## Usage
-
-1.  **Upload Data**: Use the provided `load_data.csv` or your own dataset. Format: `timestamp` (YYYY-MM-DD HH:MM), `load` (numeric).
-2.  **Configure**: Set the desired forecast horizon (e.g., 24 hours).
-3.  **Run**: Click "Run Forecast Analysis".
-4.  **Analyze**: View the generated forecast, unit commitment schedule, and maintenance suggestions.
-
-## License
-
-MIT
+- `src/utils/signalProcessing.ts`: Savitzky-Golay implementation.
+- `src/utils/gemini.ts`: Interface with Google Generative AI.
+- `src/utils/decisionLogic.ts`: Logic for unit commitment and maintenance.
+- `app/api/forecast/route.ts`: Main API handler.
+- `src/components/`: Reusable UI components (Neomorphic style).

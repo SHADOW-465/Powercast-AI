@@ -35,12 +35,14 @@ export async function POST(req: NextRequest) {
     // 2. Forecasting (Gemini)
     // We pass the SMOOTHED data to the AI for better trend detection
     // Limit to context size if needed, but generateForecast handles slicing.
-    let forecast = [];
+    let aiResult;
     try {
-        forecast = await generateForecast(apiKey, processedHistory, horizon, horizonUnit);
+        aiResult = await generateForecast(apiKey, processedHistory, horizon, horizonUnit);
     } catch (error: any) {
         return NextResponse.json({ error: "Forecasting failed: " + error.message }, { status: 500 });
     }
+
+    const { forecast, analysis, recommendations } = aiResult;
 
     // 3. Decision Support
     // Combine history (tail) + forecast for continuous view, or just forecast.
@@ -54,6 +56,8 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       processedHistory, // Return smoothed data for plotting
       forecast,
+      analysis,
+      recommendations,
       unitCommitment,
       maintenance
     });
