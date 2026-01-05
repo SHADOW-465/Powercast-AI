@@ -3,17 +3,104 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 :root {
-  --background: #ffffff;
-  --foreground: #0f172a;
+  /* User requested solid pale off-white/light grey */
+  --background: #F0F2F5;
+  --foreground: #2D3748; /* Dark charcoal */
+
+  --shadow-light: #ffffff;
+  --shadow-dark: #d1d9e6; /* Tuned for F0F2F5 */
 }
 
+/* Dark mode overrides (optional, but good for completeness if system switches) */
 .dark {
-  --background: #020617;
-  --foreground: #f8fafc;
+  --background: #2D3748;
+  --foreground: #F0F2F5;
+  --shadow-light: #3a4659;
+  --shadow-dark: #1a202c;
 }
 
 body {
-  background: var(--background);
+  background-color: var(--background);
   color: var(--foreground);
   font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
+  margin: 0;
+  padding: 0;
+}
+
+/* Neomorphic Utilities */
+@layer components {
+  /* Standard Extruded Card/Button */
+  .neo-card {
+    @apply bg-[var(--background)] rounded-2xl;
+    box-shadow:
+      -6px -6px 14px var(--shadow-light),
+      6px 6px 14px var(--shadow-dark);
+  }
+
+  /* Hover State for clickable extruded elements */
+  .neo-card-hover:hover {
+    transform: translateY(-1px);
+    box-shadow:
+      -8px -8px 16px var(--shadow-light),
+      8px 8px 16px var(--shadow-dark);
+    transition: all 0.3s ease;
+  }
+
+  /* Pressed / Active State (Inset) */
+  .neo-inset {
+    @apply bg-[var(--background)] rounded-xl;
+    box-shadow:
+      inset 6px 6px 10px var(--shadow-dark),
+      inset -6px -6px 10px var(--shadow-light);
+  }
+
+  /* Specific Button Style */
+  .neo-btn {
+    @apply bg-[var(--background)] text-[var(--foreground)] font-bold py-3 px-6 rounded-xl flex items-center justify-center transition-all duration-200 cursor-pointer;
+    box-shadow:
+      -6px -6px 14px var(--shadow-light),
+      6px 6px 14px var(--shadow-dark);
+  }
+
+  .neo-btn:active {
+    box-shadow:
+      inset 4px 4px 8px var(--shadow-dark),
+      inset -4px -4px 8px var(--shadow-light);
+    transform: translateY(1px);
+  }
+
+  .neo-btn-primary {
+    @apply text-blue-600;
+  }
+
+  /* Range Slider Thumb & Track Customization */
+  input[type=range] {
+    -webkit-appearance: none;
+    background: transparent;
+  }
+
+  input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    height: 20px;
+    width: 20px;
+    border-radius: 50%;
+    background: var(--background);
+    box-shadow:
+      -2px -2px 5px var(--shadow-light),
+      2px 2px 5px var(--shadow-dark);
+    cursor: pointer;
+    margin-top: -8px;
+    border: 2px solid #F0F2F5; /* Matches bg */
+  }
+
+  input[type=range]::-webkit-slider-runnable-track {
+    width: 100%;
+    height: 6px;
+    cursor: pointer;
+    background: var(--background);
+    border-radius: 999px;
+    box-shadow:
+      inset 2px 2px 5px var(--shadow-dark),
+      inset -2px -2px 5px var(--shadow-light);
+  }
 }

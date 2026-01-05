@@ -1,11 +1,17 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
+export interface ForecastResult {
+  forecast: { timestamp: string; load: number }[];
+  analysis: string;
+  recommendations: string;
+}
+
 export async function generateForecast(
   apiKey: string,
   historicalData: { timestamp: string; load: number }[],
   horizon: number, // Number of future steps
   horizonUnit: 'hours' | 'days' = 'hours'
-): Promise<{ timestamp: string; load: number }[]> {
+): Promise<ForecastResult> {
 
   if (!apiKey) {
     throw new Error("API Key is missing");
@@ -23,7 +29,7 @@ export async function generateForecast(
   // Construct prompt
   const prompt = `
     You are an expert electrical load forecasting system.
-    Task: Forecast the electrical load for the next ${horizon} ${horizonUnit}.
+    Task: Forecast the electrical load for the next ${horizon} ${horizonUnit} and provide expert analysis.
 
     Historical Load Data (Chronological):
     ${dataStr}
@@ -31,11 +37,13 @@ export async function generateForecast(
     Instructions:
     1. Analyze the trend and seasonality in the provided data.
     2. Predict the load values for the next ${horizon} ${horizonUnit} starting after the last provided timestamp.
-    3. Return ONLY a valid JSON array of numbers representing the forecasted load values. Do not include timestamps in the JSON, just the values.
-    4. Do not include markdown formatting like \`\`\`json. Just the raw JSON array.
-
-    Example Output:
-    [120.5, 125.3, 110.0]
+    3. Return ONLY a valid JSON object with this exact structure:
+    {
+      "forecast": [number, number, ...],
+      "analysis": "Short text analyzing the trend (max 2 sentences)",
+      "recommendations": "Short text suggesting operational actions (max 2 sentences)"
+    }
+    4. Do not include markdown formatting like \`\`\`json. Just the raw JSON object.
   `;
 
   try {
@@ -46,25 +54,23 @@ export async function generateForecast(
     // Clean up response if it contains markdown
     const cleanedText = text.replace(/```json/g, '').replace(/```/g, '').trim();
 
-    let forecastValues: number[];
+    let parsed: any;
     try {
-        forecastValues = JSON.parse(cleanedText);
+        parsed = JSON.parse(cleanedText);
     } catch (e) {
         console.error("Failed to parse Gemini response:", text);
-        // Fallback or retry logic could go here.
-        // For now, throw error.
         throw new Error("Failed to parse AI forecast response.");
     }
 
-    if (!Array.isArray(forecastValues)) {
-         throw new Error("AI response is not an array.");
+    if (!parsed.forecast || !Array.isArray(parsed.forecast)) {
+         throw new Error("AI response missing forecast array.");
     }
 
     // Generate timestamps for forecast
     const forecast: { timestamp: string; load: number }[] = [];
     let currentTime = new Date(lastTimestamp);
 
-    for (const val of forecastValues) {
+    for (const val of parsed.forecast) {
         if (horizonUnit === 'hours') {
             currentTime.setHours(currentTime.getHours() + 1);
         } else {
@@ -78,7 +84,11 @@ export async function generateForecast(
         if (forecast.length >= horizon) break;
     }
 
-    return forecast;
+    return {
+        forecast,
+        analysis: parsed.analysis || "No analysis provided.",
+        recommendations: parsed.recommendations || "No recommendations provided."
+    };
 
   } catch (error) {
     console.error("Gemini API Error:", error);
