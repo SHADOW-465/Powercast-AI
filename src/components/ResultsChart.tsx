@@ -122,7 +122,7 @@ export default function ResultsChart({ history, forecast, horizon, horizonUnit, 
             </div>
         </div>
 
-      <div className="flex-1 w-full min-h-0 relative pl-2">
+      <div className="w-full relative pl-2" style={{ height: '280px' }}>
         <ResponsiveContainer width="100%" height="100%">
             <AreaChart data={data} margin={{ top: 10, right: 10, left: 10, bottom: 20 }}>
             <defs>

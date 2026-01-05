@@ -58,94 +58,115 @@ export default function Home() {
   };
 
   return (
-    <main className="min-h-screen p-6 md:p-8 flex flex-col md:flex-row gap-8 overflow-hidden bg-[#F0F2F5]">
-       {/* Sidebar */}
-       <div className="w-full md:w-1/4 min-w-[340px] flex flex-col gap-6">
-            <h1 className="text-xs font-bold tracking-wider text-slate-500 uppercase mb-2 ml-1">Input & Configuration</h1>
-            <SystemConfig
-                onDataLoaded={setHistoricalData}
-                dataCount={historicalData.length}
+    <main className="min-h-screen p-6 md:p-8 flex flex-col gap-6 overflow-auto bg-[#F0F2F5]">
+      {/* Header */}
+      <header className="flex items-center justify-between mb-2">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl neo-card flex items-center justify-center">
+            <Zap className="w-5 h-5 text-blue-500" />
+          </div>
+          <div>
+            <h1 className="text-xl font-bold text-slate-700">PowerCast AI</h1>
+          </div>
+        </div>
+        <div className="flex items-center gap-2 px-4 py-2 neo-card rounded-full">
+          <div className={`w-2 h-2 rounded-full ${loading ? 'bg-yellow-400 animate-pulse' : results ? 'bg-green-400' : 'bg-blue-400'}`}></div>
+          <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+            {loading ? 'Processing' : results ? 'Forecast Ready' : 'System Ready'}
+          </span>
+        </div>
+      </header>
+
+      {/* Main Layout */}
+      <div className="flex flex-col md:flex-row gap-8 flex-1">
+        {/* Sidebar */}
+        <div className="w-full md:w-1/4 min-w-[340px] flex flex-col gap-6">
+          <h2 className="text-xs font-bold tracking-wider text-slate-500 uppercase mb-2 ml-1">Input & Configuration</h2>
+          <SystemConfig
+            onDataLoaded={setHistoricalData}
+            dataCount={historicalData.length}
+            horizon={horizon}
+            setHorizon={setHorizon}
+            horizonUnit={horizonUnit}
+            setHorizonUnit={setHorizonUnit}
+            lookback={lookback}
+            setLookback={setLookback}
+            units={units}
+            setUnits={setUnits}
+            onRunForecast={handleRunForecast}
+            isLoading={loading}
+          />
+        </div>
+
+        {/* Main Content */}
+        <div className="w-full md:w-3/4 flex flex-col gap-6 h-full overflow-y-auto pr-2 pb-10">
+          <h1 className="text-xs font-bold tracking-wider text-slate-500 uppercase mb-2 ml-1">Forecasting & Decision Support</h1>
+
+          {/* Chart Panel */}
+          <div className="min-h-[420px]">
+            {results ? (
+              <ResultsChart
+                history={results.processedHistory}
+                forecast={results.forecast}
                 horizon={horizon}
-                setHorizon={setHorizon}
                 horizonUnit={horizonUnit}
-                setHorizonUnit={setHorizonUnit}
-                lookback={lookback}
-                setLookback={setLookback}
-                units={units}
-                setUnits={setUnits}
-                onRunForecast={handleRunForecast}
-                isLoading={loading}
-            />
-       </div>
-
-       {/* Main Content */}
-       <div className="w-full md:w-3/4 flex flex-col gap-6 h-full overflow-y-auto pr-2 pb-10">
-            <h1 className="text-xs font-bold tracking-wider text-slate-500 uppercase mb-2 ml-1">Forecasting & Decision Support</h1>
-
-            {/* Chart Panel */}
-            <div className="min-h-[420px]">
-                {results ? (
-                    <ResultsChart
-                        history={results.processedHistory}
-                        forecast={results.forecast}
-                        horizon={horizon}
-                        horizonUnit={horizonUnit}
-                        maintenanceWindows={results.maintenance}
-                    />
-                ) : (
-                    <div className="neo-card w-full h-full p-6 flex flex-col">
-                        <h2 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-4">Dynamic Load Forecast Visualization</h2>
-                        <div className="flex-1 flex flex-col items-center justify-center opacity-40">
-                            <BarChart3 className="w-12 h-12 mb-3 text-slate-400" />
-                            <p className="text-sm font-medium text-slate-500">
-                                {loading ? 'Processing Forecast...' : 'Awaiting Forecast Execution'}
-                            </p>
-                        </div>
-                    </div>
-                )}
-            </div>
-
-            {/* Middle Panels: Unit Commitment & Future Planning */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 min-h-[380px]">
-
-                {/* Unit Commitment */}
-                <div className="h-full">
-                     {results ? (
-                         <StatusBoard unitCommitment={results.unitCommitment} maintenance={results.maintenance} units={units} />
-                     ) : (
-                         <div className="neo-card w-full h-full p-6 flex flex-col">
-                            <h2 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-6">Optimized Unit Commitment & Maintenance</h2>
-                            <div className="flex-1 flex flex-col items-center justify-center opacity-40">
-                                <Zap className="w-10 h-10 mb-3 text-slate-400" />
-                                <p className="text-sm font-medium text-slate-500">Unit Status Pending</p>
-                            </div>
-                         </div>
-                     )}
+                maintenanceWindows={results.maintenance}
+              />
+            ) : (
+              <div className="neo-card w-full h-full p-6 flex flex-col">
+                <h2 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-4">Dynamic Load Forecast Visualization</h2>
+                <div className="flex-1 flex flex-col items-center justify-center opacity-40">
+                  <BarChart3 className="w-12 h-12 mb-3 text-slate-400" />
+                  <p className="text-sm font-medium text-slate-500">
+                    {loading ? 'Processing Forecast...' : 'Awaiting Forecast Execution'}
+                  </p>
                 </div>
+              </div>
+            )}
+          </div>
 
-                {/* Future Planning (New) */}
-                <div className="h-full">
-                     <FuturePlanning expansion={results?.expansion} />
+          {/* Middle Panels: Unit Commitment & Future Planning */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 min-h-[380px]">
+
+            {/* Unit Commitment */}
+            <div className="h-full">
+              {results ? (
+                <StatusBoard unitCommitment={results.unitCommitment} maintenance={results.maintenance} units={units} />
+              ) : (
+                <div className="neo-card w-full h-full p-6 flex flex-col">
+                  <h2 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-6">Optimized Unit Commitment & Maintenance</h2>
+                  <div className="flex-1 flex flex-col items-center justify-center opacity-40">
+                    <Zap className="w-10 h-10 mb-3 text-slate-400" />
+                    <p className="text-sm font-medium text-slate-500">Unit Status Pending</p>
+                  </div>
                 </div>
-
+              )}
             </div>
 
-             {/* Bottom: AI Insights */}
-             <div className="min-h-[300px]">
-                 {results ? (
-                     <AIInsights analysis={results.analysis} recommendations={results.recommendations} />
-                 ) : (
-                     <div className="neo-card w-full h-full p-6 flex flex-col">
-                        <h2 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-4">AI Insights & Reasoning</h2>
-                        <div className="flex-1 flex flex-col items-center justify-center opacity-40">
-                            <Sparkles className="w-10 h-10 mb-3 text-slate-400" />
-                            <p className="text-sm font-medium text-slate-500">Gemini Engine Ready</p>
-                        </div>
-                     </div>
-                 )}
+            {/* Future Planning (New) */}
+            <div className="h-full">
+              <FuturePlanning expansion={results?.expansion} />
             </div>
 
-       </div>
+          </div>
+
+          {/* Bottom: AI Insights */}
+          <div className="min-h-[300px]">
+            {results ? (
+              <AIInsights analysis={results.analysis} recommendations={results.recommendations} />
+            ) : (
+              <div className="neo-card w-full h-full p-6 flex flex-col">
+                <h2 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-4">AI Insights & Reasoning</h2>
+                <div className="flex-1 flex flex-col items-center justify-center opacity-40">
+                  <Sparkles className="w-10 h-10 mb-3 text-slate-400" />
+                  <p className="text-sm font-medium text-slate-500">Gemini Engine Ready</p>
+                </div>
+              </div>
+            )}
+          </div>
+
+        </div>
+      </div>
     </main>
   );
 }
