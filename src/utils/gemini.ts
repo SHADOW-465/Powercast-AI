@@ -82,7 +82,7 @@ export async function generateForecast(
 
     // Generate timestamps for forecast
     const forecast: { timestamp: string; load: number }[] = [];
-    let currentTime = new Date(lastTimestamp);
+    const currentTime = new Date(lastTimestamp);
 
     for (const val of parsed.forecast) {
         if (horizonUnit === 'hours') {
