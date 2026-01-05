@@ -14,6 +14,7 @@ export default function Home() {
   const [loading, setLoading] = useState(false);
   const [results, setResults] = useState<any>(null);
 
+  // Default units (with stable IDs)
   const [units, setUnits] = useState([
     { id: 'u1', name: 'Thermal Unit A', capacityMW: 2500, type: 'Capacity' },
     { id: 'u2', name: 'Hydro Unit B', capacityMW: 3500, type: 'Hydro' },
@@ -27,6 +28,8 @@ export default function Home() {
     }
 
     setLoading(true);
+    setResults(null); // Clear previous results to trigger loading state
+
     try {
       const res = await fetch('/api/forecast', {
         method: 'POST',
@@ -84,7 +87,9 @@ export default function Home() {
                         <h2 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-4">Dynamic Load Forecast Visualization</h2>
                         <div className="flex-1 flex flex-col items-center justify-center opacity-40">
                             <BarChart3 className="w-12 h-12 mb-3 text-slate-400" />
-                            <p className="text-sm font-medium text-slate-500">Awaiting Forecast Execution</p>
+                            <p className="text-sm font-medium text-slate-500">
+                                {loading ? 'Processing Forecast...' : 'Awaiting Forecast Execution'}
+                            </p>
                         </div>
                     </div>
                 )}
