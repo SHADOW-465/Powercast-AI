@@ -16,8 +16,8 @@ interface SystemConfigProps {
   dataCount: number;
   horizon: number;
   setHorizon: (val: number) => void;
-  horizonUnit: 'hours' | 'days';
-  setHorizonUnit: (val: 'hours' | 'days') => void;
+  horizonUnit: 'hours' | 'days' | 'years';
+  setHorizonUnit: (val: 'hours' | 'days' | 'years') => void;
   lookback: number;
   setLookback: (val: number) => void;
   units: GeneratorUnit[];
@@ -141,11 +141,12 @@ export default function SystemConfig({
                             <label className="text-[10px] font-bold text-slate-400 uppercase">Unit</label>
                             <select
                                 value={horizonUnit}
-                                onChange={(e) => setHorizonUnit(e.target.value as 'hours' | 'days')}
+                                onChange={(e) => setHorizonUnit(e.target.value as 'hours' | 'days' | 'years')}
                                 className="w-full neo-inset rounded-lg p-2 text-xs font-bold text-slate-700 outline-none bg-transparent"
                             >
                                 <option value="hours">Hours</option>
                                 <option value="days">Days</option>
+                                <option value="years">Years</option>
                             </select>
                         </div>
                      </div>
