@@ -8,9 +8,10 @@ interface ResultsChartProps {
   history: any[];
   forecast: any[];
   horizon: number;
+  maintenanceWindows?: any[];
 }
 
-export default function ResultsChart({ history, forecast, horizon }: ResultsChartProps) {
+export default function ResultsChart({ history, forecast, horizon, maintenanceWindows = [] }: ResultsChartProps) {
 
   // Safe data preparation
   const data = useMemo(() => {
@@ -18,7 +19,6 @@ export default function ResultsChart({ history, forecast, horizon }: ResultsChar
       const safeForecast = Array.isArray(forecast) ? forecast : [];
 
       // Map History
-      // Ensure we treat NaNs as nulls for Recharts
       const historyTail = safeHistory.slice(-48).map(d => ({
         timestamp: d.timestamp,
         actual: isNaN(d.originalLoad) ? null : d.originalLoad,
@@ -34,16 +34,15 @@ export default function ResultsChart({ history, forecast, horizon }: ResultsChar
         predicted: isNaN(d.load) ? null : d.load
       }));
 
-      // Create Bridge Point (connecting the last history point to the first forecast point)
+      // Create Bridge Point
       if (historyTail.length > 0 && forecastData.length > 0) {
           const lastHist = historyTail[historyTail.length - 1];
-          // Only bridge if last history point is valid
           if (lastHist.smoothed !== null) {
               const bridge = {
                   timestamp: lastHist.timestamp,
                   actual: null,
                   smoothed: lastHist.smoothed,
-                  predicted: lastHist.smoothed // Start prediction line from smoothed history end
+                  predicted: lastHist.smoothed
               };
               forecastData.unshift(bridge);
           }
@@ -54,13 +53,10 @@ export default function ResultsChart({ history, forecast, horizon }: ResultsChar
 
   const startForecastIndex = data.findIndex(d => d.predicted !== null);
 
-  // Safe tick formatter
   const formatXAxis = (val: string) => {
       if (!val) return '';
-      // Try splitting by space (YYYY-MM-DD HH:MM)
       const parts = val.split(' ');
-      if (parts.length > 1) return parts[1];
-      // If no space, maybe it's just a date or time? return as is or substring
+      if (parts.length > 1) return parts[1]; // Return time part only
       return val.length > 5 ? val.slice(0, 5) : val;
   };
 
@@ -76,9 +72,8 @@ export default function ResultsChart({ history, forecast, horizon }: ResultsChar
     <div className="neo-card w-full h-full p-6 relative flex flex-col min-h-[400px]">
         {/* Header inside the chart card */}
         <div className="flex justify-between items-start mb-4 z-10">
-            <h2 className="text-xs font-bold text-slate-500 uppercase tracking-wider">Dynamic Load Forecast Visualization</h2>
+            <h2 className="text-xs font-bold text-slate-500 uppercase tracking-wider">Dynamic Load Forecast</h2>
 
-            {/* Zoom Controls */}
             <div className="flex items-center gap-2">
                 <div className="neo-btn px-3 py-1 text-[10px] gap-2 cursor-pointer hover:text-blue-500">
                     <Maximize2 className="w-3 h-3" />
@@ -100,6 +95,10 @@ export default function ResultsChart({ history, forecast, horizon }: ResultsChar
             <div className="flex items-center gap-2">
                 <div className="w-2 h-2 rounded-full bg-orange-400 shadow-[0_0_8px_rgba(251,146,60,0.6)]"></div>
                 <span className="text-[10px] font-bold text-slate-500">Predicted</span>
+            </div>
+             <div className="flex items-center gap-2">
+                <div className="w-2 h-2 rounded-full bg-red-400/50 border border-red-400 border-dashed"></div>
+                <span className="text-[10px] font-bold text-slate-500">Maintenance</span>
             </div>
         </div>
 
@@ -152,10 +151,22 @@ export default function ResultsChart({ history, forecast, horizon }: ResultsChar
                 />
             )}
 
+            {/* Maintenance Windows */}
+            {maintenanceWindows.map((win, idx) => (
+                <ReferenceArea
+                    key={idx}
+                    x1={win.startTimestamp}
+                    x2={win.endTimestamp}
+                    fill="#F87171"
+                    fillOpacity={0.15}
+                    strokeOpacity={0.5}
+                />
+            ))}
+
             <Area
                 type="monotone"
                 dataKey="actual"
-                stroke="#60A5FA" // Blue
+                stroke="#60A5FA"
                 strokeWidth={2}
                 fill="url(#colorActual)"
                 connectNulls={false}
@@ -164,7 +175,7 @@ export default function ResultsChart({ history, forecast, horizon }: ResultsChar
             <Area
                 type="monotone"
                 dataKey="smoothed"
-                stroke="#4ADE80" // Green
+                stroke="#4ADE80"
                 strokeWidth={2}
                 fill="transparent"
                 strokeDasharray="0"
@@ -173,7 +184,7 @@ export default function ResultsChart({ history, forecast, horizon }: ResultsChar
              <Area
                 type="monotone"
                 dataKey="predicted"
-                stroke="#FB923C" // Orange
+                stroke="#FB923C"
                 strokeWidth={3}
                 fill="url(#colorPredicted)"
                 connectNulls={true}
@@ -189,7 +200,7 @@ export default function ResultsChart({ history, forecast, horizon }: ResultsChar
             <span className="text-[10px] font-bold text-slate-400 tracking-widest uppercase bg-[#F0F2F5]/80 px-2 py-1 rounded">Forecast Horizon</span>
         </div>
 
-        {/* Zoom Controls Overlay (Bottom Right) */}
+        {/* Zoom Controls Overlay */}
         <div className="absolute bottom-4 right-4 flex gap-2">
              <button className="w-8 h-8 rounded-lg neo-card flex items-center justify-center text-slate-500 hover:text-blue-500 active:scale-95 transition-transform">
                  <ZoomOut className="w-4 h-4" />
