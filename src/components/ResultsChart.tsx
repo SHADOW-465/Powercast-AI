@@ -60,7 +60,9 @@ export default function ResultsChart({ history, forecast, horizon, horizonUnit, 
       // Dynamic X-axis adaptation logic
       if (horizonUnit === 'hours') {
           // Just time: HH:mm
-          return val.split(' ')[1] || val;
+          // Or if strict "0, 1, 2..." needed, we rely on index if we assume hourly steps?
+          // But data might be irregular. Let's stick to time.
+          return val.split(' ')[1] ? val.split(' ')[1].slice(0, 5) : val;
       } else if (horizonUnit === 'days') {
           // Date: MM-DD
           const parts = val.split(' ')[0].split('-');
@@ -88,43 +90,39 @@ export default function ResultsChart({ history, forecast, horizon, horizonUnit, 
       );
   }
 
+  // Calculate X-axis ticks to avoid overcrowding
+  const tickInterval = Math.ceil(data.length / 8);
+
   return (
     <div className="neo-card w-full h-full p-6 relative flex flex-col min-h-[400px]">
         {/* Header inside the chart card */}
         <div className="flex justify-between items-start mb-4 z-10">
-            <h2 className="text-xs font-bold text-slate-500 uppercase tracking-wider">Dynamic Load Forecast</h2>
-
-            <div className="flex items-center gap-2">
-                <div className="neo-btn px-3 py-1 text-[10px] gap-2 cursor-pointer hover:text-blue-500">
-                    <Maximize2 className="w-3 h-3" />
-                    <span>Zoom/Pan</span>
-                </div>
-            </div>
+            <h2 className="text-xs font-bold text-slate-500 uppercase tracking-wider">Dynamic Load Forecast Visualization</h2>
         </div>
 
         {/* Legend Overlay */}
-        <div className="flex justify-center gap-6 mb-2">
+        <div className="flex flex-wrap justify-center gap-4 md:gap-6 mb-2">
             <div className="flex items-center gap-2">
                 <div className="w-2 h-2 rounded-full bg-blue-400 shadow-[0_0_8px_rgba(96,165,250,0.6)]"></div>
-                <span className="text-[10px] font-bold text-slate-500">Historical</span>
+                <span className="text-[10px] font-bold text-slate-500">Historical Load</span>
             </div>
             <div className="flex items-center gap-2">
                 <div className="w-2 h-2 rounded-full bg-green-400 shadow-[0_0_8px_rgba(74,222,128,0.6)]"></div>
-                <span className="text-[10px] font-bold text-slate-500">Smoothed</span>
+                <span className="text-[10px] font-bold text-slate-500">Smoothed Load</span>
             </div>
             <div className="flex items-center gap-2">
-                <div className="w-2 h-2 rounded-full bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.6)]"></div>
-                <span className="text-[10px] font-bold text-slate-500">Predicted (Red)</span>
+                <div className="w-2 h-2 rounded-full bg-[#EF4444] shadow-[0_0_8px_rgba(239,68,68,0.6)]"></div>
+                <span className="text-[10px] font-bold text-slate-500">Predicted Load (Red)</span>
             </div>
              <div className="flex items-center gap-2">
-                <div className="w-2 h-2 rounded-full bg-red-400/50 border border-red-400 border-dashed"></div>
-                <span className="text-[10px] font-bold text-slate-500">Maintenance</span>
+                 <div className="w-4 h-2 bg-red-100 border border-red-200"></div>
+                 <span className="text-[10px] font-bold text-slate-500">Forecast Region</span>
             </div>
         </div>
 
-      <div className="w-full relative pl-2" style={{ height: '280px' }}>
+      <div className="w-full flex-1 relative pl-2 min-h-[280px]">
         <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={data} margin={{ top: 10, right: 10, left: 10, bottom: 20 }}>
+            <AreaChart data={data} margin={{ top: 10, right: 10, left: 20, bottom: 20 }}>
             <defs>
                 <linearGradient id="colorActual" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="5%" stopColor="#60A5FA" stopOpacity={0.1}/>
@@ -138,22 +136,26 @@ export default function ResultsChart({ history, forecast, horizon, horizonUnit, 
             </defs>
 
             <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" vertical={false} />
+
             <XAxis
                 dataKey="timestamp"
                 tick={{fontSize: 10, fill: '#94A3B8'}}
                 axisLine={false}
                 tickLine={false}
+                interval="preserveStartEnd"
                 minTickGap={30}
                 tickFormatter={formatXAxis}
             >
-                <Label value={getXAxisLabel()} offset={-5} position="insideBottom" style={{fontSize: '10px', fill: '#64748B', fontWeight: 'bold', textTransform: 'uppercase'}} />
+                <Label value={getXAxisLabel()} offset={0} position="insideBottom" style={{fontSize: '10px', fill: '#64748B', fontWeight: 'bold', textTransform: 'uppercase'}} />
             </XAxis>
+
             <YAxis
                 tick={{fontSize: 10, fill: '#94A3B8'}}
                 axisLine={false}
                 tickLine={false}
-                label={{ value: 'Power Demand', angle: -90, position: 'insideLeft', style: {fontSize: '10px', fill: '#64748B', fontWeight: 'bold', textTransform: 'uppercase'} }}
+                label={{ value: 'Power Demand (MW)', angle: -90, position: 'insideLeft', style: {fontSize: '10px', fill: '#64748B', fontWeight: 'bold', textTransform: 'uppercase'} }}
             />
+
             <Tooltip
                 contentStyle={{
                     backgroundColor: '#F0F2F5',
@@ -163,16 +165,23 @@ export default function ResultsChart({ history, forecast, horizon, horizonUnit, 
                     fontSize: '12px',
                     color: '#2D3748'
                 }}
+                labelStyle={{ fontWeight: 'bold', color: '#64748B', marginBottom: '5px' }}
+                formatter={(value: any, name: any) => [
+                    `${Number(value).toFixed(1)} MW`,
+                    name === 'actual' ? 'Historical' : name === 'smoothed' ? 'Smoothed' : 'Predicted'
+                ]}
             />
 
-            {/* Shaded Forecast Zone */}
+            {/* Shaded Forecast Zone - Explicitly Highlighting the region */}
             {startForecastIndex > 0 && (
                 <ReferenceArea
                     x1={data[startForecastIndex]?.timestamp}
                     x2={data[data.length-1]?.timestamp}
                     fill="#EF4444"
                     fillOpacity={0.05}
-                />
+                >
+                     <Label value="FORECAST REGION" position="insideTopRight" fill="#EF4444" fontSize={10} fontWeight="bold" opacity={0.5} offset={10} />
+                </ReferenceArea>
             )}
 
             {/* Maintenance Windows */}
@@ -181,9 +190,8 @@ export default function ResultsChart({ history, forecast, horizon, horizonUnit, 
                     key={idx}
                     x1={win.startTimestamp}
                     x2={win.endTimestamp}
-                    fill="#F87171"
-                    fillOpacity={0.15}
-                    strokeOpacity={0.5}
+                    fill="#F87171" // Reddish
+                    fillOpacity={0.1}
                 />
             ))}
 
@@ -218,21 +226,6 @@ export default function ResultsChart({ history, forecast, horizon, horizonUnit, 
 
             </AreaChart>
         </ResponsiveContainer>
-
-        {/* Forecast Horizon Label Overlay */}
-        <div className="absolute top-4 right-10 pointer-events-none">
-            <span className="text-[10px] font-bold text-slate-400 tracking-widest uppercase bg-[#F0F2F5]/80 px-2 py-1 rounded">Forecast Horizon</span>
-        </div>
-
-        {/* Zoom Controls Overlay */}
-        <div className="absolute bottom-4 right-4 flex gap-2">
-             <button className="w-8 h-8 rounded-lg neo-card flex items-center justify-center text-slate-500 hover:text-blue-500 active:scale-95 transition-transform">
-                 <ZoomOut className="w-4 h-4" />
-             </button>
-             <button className="w-8 h-8 rounded-lg neo-card flex items-center justify-center text-slate-500 hover:text-blue-500 active:scale-95 transition-transform">
-                 <ZoomIn className="w-4 h-4" />
-             </button>
-        </div>
       </div>
     </div>
   );
