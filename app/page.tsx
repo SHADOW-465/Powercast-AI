@@ -11,7 +11,7 @@ import { BarChart3, Zap, Sparkles } from 'lucide-react';
 export default function Home() {
   const [historicalData, setHistoricalData] = useState<any[]>([]);
   const [horizon, setHorizon] = useState(24);
-  const [horizonUnit, setHorizonUnit] = useState<'hours' | 'days'>('hours');
+  const [horizonUnit, setHorizonUnit] = useState<'hours' | 'days' | 'years'>('hours');
   const [lookback, setLookback] = useState(48);
   const [loading, setLoading] = useState(false);
   const [results, setResults] = useState<any>(null);
@@ -89,6 +89,7 @@ export default function Home() {
                         history={results.processedHistory}
                         forecast={results.forecast}
                         horizon={horizon}
+                        horizonUnit={horizonUnit}
                         maintenanceWindows={results.maintenance}
                     />
                 ) : (

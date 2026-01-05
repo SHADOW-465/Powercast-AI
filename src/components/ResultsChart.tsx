@@ -1,6 +1,6 @@
 "use client";
 
-import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ReferenceArea } from 'recharts';
+import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ReferenceArea, Label } from 'recharts';
 import { ZoomIn, ZoomOut, Maximize2 } from 'lucide-react';
 import { useMemo } from 'react';
 
@@ -8,10 +8,11 @@ interface ResultsChartProps {
   history: any[];
   forecast: any[];
   horizon: number;
+  horizonUnit: 'hours' | 'days' | 'years';
   maintenanceWindows?: any[];
 }
 
-export default function ResultsChart({ history, forecast, horizon, maintenanceWindows = [] }: ResultsChartProps) {
+export default function ResultsChart({ history, forecast, horizon, horizonUnit, maintenanceWindows = [] }: ResultsChartProps) {
 
   // Safe data preparation
   const data = useMemo(() => {
@@ -42,7 +43,7 @@ export default function ResultsChart({ history, forecast, horizon, maintenanceWi
                   timestamp: lastHist.timestamp,
                   actual: null,
                   smoothed: lastHist.smoothed,
-                  predicted: lastHist.smoothed
+                  predicted: lastHist.smoothed // Start prediction line from smoothed history end
               };
               forecastData.unshift(bridge);
           }
@@ -53,11 +54,30 @@ export default function ResultsChart({ history, forecast, horizon, maintenanceWi
 
   const startForecastIndex = data.findIndex(d => d.predicted !== null);
 
-  const formatXAxis = (val: string) => {
+  const formatXAxis = (val: string, index: number) => {
       if (!val) return '';
-      const parts = val.split(' ');
-      if (parts.length > 1) return parts[1]; // Return time part only
-      return val.length > 5 ? val.slice(0, 5) : val;
+
+      // Dynamic X-axis adaptation logic
+      if (horizonUnit === 'hours') {
+          // Just time: HH:mm
+          return val.split(' ')[1] || val;
+      } else if (horizonUnit === 'days') {
+          // Date: MM-DD
+          const parts = val.split(' ')[0].split('-');
+          return parts.length >= 3 ? `${parts[1]}-${parts[2]}` : val;
+      } else if (horizonUnit === 'years') {
+          // Year: YYYY
+          const parts = val.split('-');
+          return parts[0];
+      }
+      return val;
+  };
+
+  const getXAxisLabel = () => {
+      if (horizonUnit === 'hours') return "Time (Hours)";
+      if (horizonUnit === 'days') return "Time (Days)";
+      if (horizonUnit === 'years') return "Time (Years)";
+      return "Time";
   };
 
   if (data.length === 0) {
@@ -93,8 +113,8 @@ export default function ResultsChart({ history, forecast, horizon, maintenanceWi
                 <span className="text-[10px] font-bold text-slate-500">Smoothed</span>
             </div>
             <div className="flex items-center gap-2">
-                <div className="w-2 h-2 rounded-full bg-orange-400 shadow-[0_0_8px_rgba(251,146,60,0.6)]"></div>
-                <span className="text-[10px] font-bold text-slate-500">Predicted</span>
+                <div className="w-2 h-2 rounded-full bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.6)]"></div>
+                <span className="text-[10px] font-bold text-slate-500">Predicted (Red)</span>
             </div>
              <div className="flex items-center gap-2">
                 <div className="w-2 h-2 rounded-full bg-red-400/50 border border-red-400 border-dashed"></div>
@@ -102,17 +122,18 @@ export default function ResultsChart({ history, forecast, horizon, maintenanceWi
             </div>
         </div>
 
-      <div className="flex-1 w-full min-h-0 relative">
+      <div className="flex-1 w-full min-h-0 relative pl-2">
         <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={data} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+            <AreaChart data={data} margin={{ top: 10, right: 10, left: 10, bottom: 20 }}>
             <defs>
                 <linearGradient id="colorActual" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="5%" stopColor="#60A5FA" stopOpacity={0.1}/>
                     <stop offset="95%" stopColor="#60A5FA" stopOpacity={0}/>
                 </linearGradient>
+                {/* Predicted gradient - Red */}
                 <linearGradient id="colorPredicted" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#FB923C" stopOpacity={0.2}/>
-                    <stop offset="95%" stopColor="#FB923C" stopOpacity={0}/>
+                    <stop offset="5%" stopColor="#EF4444" stopOpacity={0.2}/>
+                    <stop offset="95%" stopColor="#EF4444" stopOpacity={0}/>
                 </linearGradient>
             </defs>
 
@@ -124,11 +145,14 @@ export default function ResultsChart({ history, forecast, horizon, maintenanceWi
                 tickLine={false}
                 minTickGap={30}
                 tickFormatter={formatXAxis}
-            />
+            >
+                <Label value={getXAxisLabel()} offset={-5} position="insideBottom" style={{fontSize: '10px', fill: '#64748B', fontWeight: 'bold', textTransform: 'uppercase'}} />
+            </XAxis>
             <YAxis
                 tick={{fontSize: 10, fill: '#94A3B8'}}
                 axisLine={false}
                 tickLine={false}
+                label={{ value: 'Power Demand', angle: -90, position: 'insideLeft', style: {fontSize: '10px', fill: '#64748B', fontWeight: 'bold', textTransform: 'uppercase'} }}
             />
             <Tooltip
                 contentStyle={{
@@ -146,7 +170,7 @@ export default function ResultsChart({ history, forecast, horizon, maintenanceWi
                 <ReferenceArea
                     x1={data[startForecastIndex]?.timestamp}
                     x2={data[data.length-1]?.timestamp}
-                    fill="#FB923C"
+                    fill="#EF4444"
                     fillOpacity={0.05}
                 />
             )}
@@ -166,7 +190,7 @@ export default function ResultsChart({ history, forecast, horizon, maintenanceWi
             <Area
                 type="monotone"
                 dataKey="actual"
-                stroke="#60A5FA"
+                stroke="#60A5FA" // Blue
                 strokeWidth={2}
                 fill="url(#colorActual)"
                 connectNulls={false}
@@ -175,7 +199,7 @@ export default function ResultsChart({ history, forecast, horizon, maintenanceWi
             <Area
                 type="monotone"
                 dataKey="smoothed"
-                stroke="#4ADE80"
+                stroke="#4ADE80" // Green
                 strokeWidth={2}
                 fill="transparent"
                 strokeDasharray="0"
@@ -184,11 +208,11 @@ export default function ResultsChart({ history, forecast, horizon, maintenanceWi
              <Area
                 type="monotone"
                 dataKey="predicted"
-                stroke="#FB923C"
+                stroke="#EF4444" // RED - MANDATORY
                 strokeWidth={3}
                 fill="url(#colorPredicted)"
                 connectNulls={true}
-                activeDot={{ r: 6, fill: "#FB923C", stroke: "#F0F2F5", strokeWidth: 2 }}
+                activeDot={{ r: 6, fill: "#EF4444", stroke: "#F0F2F5", strokeWidth: 2 }}
                 animationDuration={1500}
             />
 

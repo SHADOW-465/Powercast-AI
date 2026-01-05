@@ -15,7 +15,7 @@ export async function generateForecast(
   apiKey: string,
   historicalData: { timestamp: string; load: number }[],
   horizon: number, // Number of future steps
-  horizonUnit: 'hours' | 'days' = 'hours'
+  horizonUnit: 'hours' | 'days' | 'years' = 'hours'
 ): Promise<ForecastResult> {
 
   if (!apiKey) {
@@ -87,8 +87,10 @@ export async function generateForecast(
     for (const val of parsed.forecast) {
         if (horizonUnit === 'hours') {
             currentTime.setHours(currentTime.getHours() + 1);
-        } else {
+        } else if (horizonUnit === 'days') {
             currentTime.setDate(currentTime.getDate() + 1);
+        } else if (horizonUnit === 'years') {
+            currentTime.setFullYear(currentTime.getFullYear() + 1);
         }
 
         // Simple formatting YYYY-MM-DD HH:MM
