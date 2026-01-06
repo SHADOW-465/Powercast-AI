@@ -13,7 +13,7 @@ import {
     Filler,
 } from 'chart.js';
 import { Line } from 'react-chartjs-2';
-import { Zap, Activity, RotateCcw } from 'lucide-react';
+import { Activity, RotateCcw } from 'lucide-react';
 
 ChartJS.register(
     CategoryScale,
@@ -45,6 +45,7 @@ export default function ResultsChart({
 
     React.useEffect(() => {
         if (typeof window !== 'undefined') {
+            // eslint-disable-next-line @typescript-eslint/no-require-imports
             const zoomPlugin = require('chartjs-plugin-zoom');
             ChartJS.register(zoomPlugin);
         }
@@ -63,7 +64,7 @@ export default function ResultsChart({
         if (horizonUnit === 'days') contextSize = 30;
         else if (horizonUnit === 'years') contextSize = 2;
 
-        const historyContext = history.slice(-contextSize);
+
         const labels = [
             ...history.map(d => d.timestamp), // Include FULL history for panning
             ...forecast.map(d => d.timestamp)
