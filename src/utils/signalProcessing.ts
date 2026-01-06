@@ -132,7 +132,7 @@ export function adaptiveSmooth(data: number[]): number[] {
     const metrics = analyzeSignalQuality(data);
 
     // 2. Select Parameters
-    let params = optimizeParameters(metrics, data.length);
+    const params = optimizeParameters(metrics, data.length);
 
     // 3. Backtest Loop (Simplified)
     // We try to smooth the data. If the smoothed data deviates too much from raw

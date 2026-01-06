@@ -9,6 +9,13 @@ export interface GeneratorUnit {
   emissionFactor: number; // kg CO2 per MWh
 }
 
+export interface MaintenanceWindowConfig {
+  id: string;
+  start: string;
+  end: string;
+  reason: string;
+}
+
 export interface UnitCommitment {
   timeIndex: number;
   timestamp: string;

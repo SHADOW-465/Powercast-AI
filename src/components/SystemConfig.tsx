@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import FileUpload from './FileUpload';
 import { Settings, Sliders, PlayCircle } from 'lucide-react';
-import { GeneratorUnit, MaintenanceWindowConfig } from '@/app/page';
+import { GeneratorUnit, MaintenanceWindowConfig } from '@/utils/decisionLogic';
 
 interface SystemConfigProps {
   onDataLoaded: (data: any[]) => void;

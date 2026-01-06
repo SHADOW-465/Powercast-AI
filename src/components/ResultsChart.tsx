@@ -11,15 +11,13 @@ interface ResultsChartProps {
   isLoading: boolean;
 }
 
-export default function ResultsChart({ history, forecast, horizon, horizonUnit, isLoading }: ResultsChartProps) {
+export default function ResultsChart({ history, forecast, horizonUnit, isLoading }: ResultsChartProps) {
 
   // Interaction State for Zooming
   const [refAreaLeft, setRefAreaLeft] = useState<string | null>(null);
   const [refAreaRight, setRefAreaRight] = useState<string | null>(null);
   const [left, setLeft] = useState<string | 'dataMin'>('dataMin');
   const [right, setRight] = useState<string | 'dataMax'>('dataMax');
-  const [top, setTop] = useState<number | 'auto'>('auto');
-  const [bottom, setBottom] = useState<number | 'auto'>('auto');
 
   // Chart Data Preparation
   const chartData = useMemo(() => {
@@ -37,7 +35,6 @@ export default function ResultsChart({ history, forecast, horizon, horizonUnit, 
     }));
 
     const lastHistoryIdx = normalizedHistory.length;
-    const lastHistoryTime = normalizedHistory[lastHistoryIdx - 1]?.name || 'Start';
 
     // Normalize Forecast
     const normalizedForecast = forecast.map((val, index) => {
@@ -147,8 +144,8 @@ export default function ResultsChart({ history, forecast, horizon, horizonUnit, 
         <LineChart
             data={chartData}
             margin={{ top: 40, right: 30, left: 0, bottom: 0 }}
-            onMouseDown={(e) => e && setRefAreaLeft(e.activeLabel)}
-            onMouseMove={(e) => refAreaLeft && setRefAreaRight(e.activeLabel)}
+            onMouseDown={(e) => e && e.activeLabel && setRefAreaLeft(e.activeLabel)}
+            onMouseMove={(e) => refAreaLeft && e && e.activeLabel && setRefAreaRight(e.activeLabel)}
             onMouseUp={zoom}
         >
           <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" />

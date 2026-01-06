@@ -12,8 +12,7 @@ export async function POST(req: NextRequest) {
       timestamps,
       forecastHorizon = 24,
       location = "New York, NY", // Default location
-      userConfig,
-      maintenanceWindows
+      units
     } = body;
 
     if (!historicalData || !Array.isArray(historicalData) || historicalData.length === 0) {
@@ -47,7 +46,7 @@ export async function POST(req: NextRequest) {
     });
 
     // 4. Calculate Unit Commitment & Maintenance
-    const units = body.units || [];
+    const generatorFleet = units || [];
 
     // Generate future timestamps if not present
     // Simple hourly increment
@@ -60,7 +59,7 @@ export async function POST(req: NextRequest) {
     const unitCommitment = calculateUnitCommitment(
         forecastResult.forecast,
         futureTimestamps,
-        units
+        generatorFleet
     );
 
     const maintenance = suggestMaintenance(

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Zap, Activity, Info } from "lucide-react";
+import { Zap, Info } from "lucide-react";
 import dynamic from 'next/dynamic';
 import SystemConfig from "@/components/SystemConfig";
 const ResultsChart = dynamic(() => import("@/components/ResultsChart"), { ssr: false });
@@ -10,24 +10,7 @@ import AIInsights from "@/components/AIInsights";
 import MaintenanceTimeline from "@/components/MaintenanceTimeline";
 import FuturePlanning from "@/components/FuturePlanning";
 
-// Unified interfaces
-export interface GeneratorUnit {
-  id: string;
-  name: string;
-  capacityMW: number;
-  type: 'solar' | 'wind' | 'hydro' | 'thermal' | 'nuclear' | 'other';
-  isRenewable: boolean;
-  status: 'ON' | 'OFF';
-  marginalCost: number;
-  emissionFactor: number;
-}
-
-export interface MaintenanceWindowConfig {
-  id: string;
-  start: string;
-  end: string;
-  reason: string;
-}
+import { GeneratorUnit, MaintenanceWindowConfig } from '@/utils/decisionLogic';
 
 export default function Home() {
   const [historicalData, setHistoricalData] = useState<any[]>([]);

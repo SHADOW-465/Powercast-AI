@@ -4,38 +4,49 @@
  * but structured for actual API integration.
  */
 
-export interface ExogenousFactors {
-    location: string;
+export interface WeatherData {
     temperature: number; // Celsius
     humidity: number; // %
     cloudCover: number; // %
     windSpeed: number; // m/s
-    isHoliday: boolean;
+    condition: string;
 }
 
 /**
  * Fetches real-time weather and environmental data for a location.
  * In a production app, this would use OpenWeatherMap or similar.
- * Here we provide a robust simulation based on the requested location.
  */
-export async function fetchExogenousFactors(location: string): Promise<ExogenousFactors> {
+export async function fetchCurrentWeather(location: string): Promise<WeatherData> {
     // Simulate network latency
-    await new Promise(resolve => setTimeout(resolve, 500));
+    await new Promise(resolve => setTimeout(resolve, 300));
 
-    // Logic to simulate varied weather based on common city names or random walk
-    // If location is provided as "Lat, Lng", we can use that in a real API.
+    // Logic to simulate varied weather based on location string
+    // This ensures consistency for demo purposes
+    const normalizedLoc = location.toLowerCase();
 
-    const seed = location.length;
-    const tempBase = 20 + (seed % 15); // 20-35 deg
-    const windBase = 5 + (seed % 10); // 5-15 m/s
-    const cloudBase = (seed * 7) % 100;
+    let temp = 20;
+    let clouds = 20;
+    let wind = 10;
+    let condition = "Clear";
+
+    if (normalizedLoc.includes("new york") || normalizedLoc.includes("ny")) {
+        temp = 12; clouds = 40; wind = 15; condition = "Partly Cloudy";
+    } else if (normalizedLoc.includes("london") || normalizedLoc.includes("uk")) {
+        temp = 9; clouds = 80; wind = 20; condition = "Overcast";
+    } else if (normalizedLoc.includes("tokyo")) {
+        temp = 18; clouds = 30; wind = 5; condition = "Clear";
+    } else if (normalizedLoc.includes("mumbai") || normalizedLoc.includes("india")) {
+        temp = 32; clouds = 10; wind = 8; condition = "Sunny";
+    }
 
     return {
-        location,
-        temperature: tempBase,
-        humidity: 50 + (seed % 30),
-        cloudCover: cloudBase,
-        windSpeed: windBase,
-        isHoliday: false // In real app, check a calendar API
+        temperature: temp,
+        humidity: 60,
+        cloudCover: clouds,
+        windSpeed: wind,
+        condition
     };
 }
+
+// Alias for backward compatibility if needed, but we will update route.ts
+export const fetchExogenousFactors = fetchCurrentWeather;
