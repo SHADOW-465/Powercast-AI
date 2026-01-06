@@ -1,6 +1,6 @@
 
 import { savitzkyGolaySmooth } from './signalProcessing';
-import { calculateUnitCommitment, suggestMaintenance } from './decisionLogic';
+import { calculateUnitCommitment, suggestMaintenance, GeneratorUnit } from './decisionLogic';
 
 // --- Test 1: Savitzky-Golay ---
 // Simple impulse or step to see if it smooths
@@ -13,9 +13,27 @@ console.log("Smoothed:", smoothed.map(n => Number(n.toFixed(2))));
 // --- Test 2: Unit Commitment ---
 const load = [100, 150, 280, 500];
 const timestamps = ["T1", "T2", "T3", "T4"];
-const units = [
-    { id: '1', name: 'Base', capacityMW: 300 },
-    { id: '2', name: 'Peaker', capacityMW: 250 }
+const units: GeneratorUnit[] = [
+    {
+        id: '1',
+        name: 'Base',
+        capacityMW: 300,
+        type: 'thermal',
+        isRenewable: false,
+        status: 'ON',
+        marginalCost: 30,
+        emissionFactor: 0.8
+    },
+    {
+        id: '2',
+        name: 'Peaker',
+        capacityMW: 250,
+        type: 'thermal',
+        isRenewable: false,
+        status: 'OFF',
+        marginalCost: 60,
+        emissionFactor: 0.5
+    }
 ];
 
 const commitment = calculateUnitCommitment(load, timestamps, units);
