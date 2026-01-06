@@ -1,12 +1,12 @@
 
-import { savitzkyGolaySmooth } from './signalProcessing';
+import { adaptiveSmooth } from './signalProcessing';
 import { calculateUnitCommitment, suggestMaintenance, GeneratorUnit } from './decisionLogic';
 
 // --- Test 1: Savitzky-Golay ---
 // Simple impulse or step to see if it smooths
 const noisyData = [10, 10, 11, 10, 9, 15, 10, 10, 10, 10, 10, 10, 10];
 // SG should flatten that spike at index 5 somewhat
-const smoothed = savitzkyGolaySmooth(noisyData);
+const smoothed = adaptiveSmooth(noisyData);
 console.log("Original:", noisyData);
 console.log("Smoothed:", smoothed.map(n => Number(n.toFixed(2))));
 
@@ -33,6 +33,16 @@ const units: GeneratorUnit[] = [
         status: 'OFF',
         marginalCost: 60,
         emissionFactor: 0.5
+    },
+    {
+        id: '3',
+        name: 'Solar 1',
+        capacityMW: 50,
+        type: 'solar',
+        isRenewable: true,
+        status: 'ON',
+        marginalCost: 0,
+        emissionFactor: 0
     }
 ];
 

@@ -1,123 +1,112 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
-import { ExogenousFactors } from "./weatherService";
 
-export interface ForecastResult {
-  forecast: { timestamp: string; load: number }[];
-  analysis: string;
-  recommendations: string;
-  environmentalImpact: number[]; // Percentage of renewables or green-score
-  expansion: {
-    timeframe: string;
-    capacityNeededMW: number;
-    reasoning: string;
+export interface ForecastRequest {
+  historicalData: number[];
+  timestamps: string[];
+  forecastHorizon: number; // e.g., 24 hours
+  location?: string;
+  context?: {
+    temperature?: number[];
+    cloudCover?: number[];
+    windSpeed?: number[];
   };
-  maintenance: {
-    startTimestamp: string;
-    endTimestamp: string;
-    reason: string;
-    avgLoad: number;
-  }[];
 }
 
-export async function generateForecast(
-  apiKey: string,
-  historicalData: { timestamp: string; load: number }[],
-  horizon: number,
-  horizonUnit: 'hours' | 'days' | 'years' = 'hours',
-  units: any[] = [],
-  exogenous?: ExogenousFactors
-): Promise<ForecastResult> {
+export interface ForecastResult {
+  forecast: number[];
+  confidenceIntervals?: { lower: number[], upper: number[] };
+  explanation?: string;
+}
+
+export async function generateForecast(req: ForecastRequest): Promise<ForecastResult> {
+  const apiKey = process.env.GEMINI_API_KEY || "";
 
   if (!apiKey) {
-    throw new Error("API Key is missing");
+    console.warn("GEMINI_API_KEY is not set. Using fallback mock generation.");
+    return generateFallbackForecast(req);
   }
 
+  // Safe initialization
   const genAI = new GoogleGenerativeAI(apiKey);
-  const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+  const model = genAI.getGenerativeModel({ model: "gemini-pro" });
 
-  const lookback = historicalData.slice(-168); // Use up to a week for better seasonality
-  const dataStr = lookback.map(d => `${d.timestamp}: ${d.load.toFixed(1)}`).join('\n');
-  const unitsStr = units.map(u => `${u.name} (${u.type}, ${u.capacityMW}MW, Renewable: ${u.isRenewable})`).join(', ');
-  const lastTimestamp = new Date(lookback[lookback.length - 1].timestamp);
+  const historyLength = req.historicalData.length;
+  const contextWindow = Math.min(48, historyLength);
+  const recentHistory = req.historicalData.slice(-contextWindow);
 
-  const exogenousStr = exogenous ? `
-    Location: ${exogenous.location}
-    Weather: Temp ${exogenous.temperature}°C, Humidity ${exogenous.humidity}%, Cloud Cover ${exogenous.cloudCover}%, Wind ${exogenous.windSpeed}m/s
-    Is Holiday: ${exogenous.isHoliday}
-  ` : "N/A";
+  let prompt = `Act as an expert electrical grid load forecaster.
+  I will provide you with a sequence of recent hourly electrical load data (in MW).
+  Your task is to predict the next ${req.forecastHorizon} hours of load.
 
-  const prompt = `
-    You are an expert electrical load forecasting and grid operations system.
+  Recent Historical Load (last ${contextWindow} hours):
+  ${recentHistory.join(", ")}
+
+  `;
+
+  if (req.location) {
+    prompt += `Location: ${req.location}\n`;
+  }
+
+  if (req.context) {
+    prompt += `Weather Context (Exogenous Factors):
+    - Temperature: ${req.context.temperature ? req.context.temperature[0] + "C (Current)" : "Not provided"}
+    - Cloud Cover: ${req.context.cloudCover ? req.context.cloudCover[0] + "%" : "Not provided"}
+    - Wind Speed: ${req.context.windSpeed ? req.context.windSpeed[0] + "km/h" : "Not provided"}
     
-    Grid Assets:
-    ${unitsStr}
+    CRITICAL CORRELATIONS TO APPLY:
+    1. Temperature vs Load: If temperature is high (>25C) or low (<10C), increase residential load prediction (AC/Heating).
+    2. Cloud Cover vs Solar (Net Load): If cloud cover is high, behind-the-meter solar generation drops, causing Net Load to INCREASE.
+    3. Wind Speed: High wind may affect cooling but primarily impacts wind generation (if applicable).
 
-    Exogenous Factors (Current/Initial):
-    ${exogenousStr}
+    Adjust the forecast trend based on these factors relative to the recent history.
+    `;
+  }
 
-    Task:
-    1. Forecast the electrical load for the next ${horizon} ${horizonUnit}.
-    2. Provide expert analysis and operational recommendations.
-    3. Analyze long-term trends to predict Future Expansion needs.
-    4. Predict optimal maintenance windows (periods of low load).
-    5. Estimate "environmentalImpact" scores for each forecast hour (0-100 green scale).
-
-    Historical Load Data (Last ${lookback.length} points):
-    ${dataStr}
-
-    Instructions:
-    - Correlate Cloud Cover vs. Solar Output and Temperature vs. Cooling/Heating load.
-    - Forecast exactly ${horizon} points.
-    - For "maintenance", find periods where load is significantly lower than average.
-    - Return ONLY valid JSON:
-    {
-      "forecast": [number, number, ...],
-      "analysis": "Short trend analysis",
-      "recommendations": "Operational advice",
-      "environmentalImpact": [number, number, ...],
-      "expansion": {
-          "timeframe": "e.g., '12-18 months'",
-          "capacityNeededMW": number,
-          "reasoning": "Reasoning"
-      },
-      "maintenance": [
-          { "startTimestamp": "YYYY-MM-DD HH:MM", "endTimestamp": "YYYY-MM-DD HH:MM", "reason": "e.g. Low Load Window", "avgLoad": number }
-      ]
-    }
+  prompt += `
+  Return the output strictly as a JSON object with the following structure:
+  {
+    "forecast": [number, number, ...], // array of length ${req.forecastHorizon}
+    "explanation": "string" // brief reasoning citing weather impact if applicable
+  }
+  Do not include markdown formatting like \`\`\`json. Just the raw JSON string.
   `;
 
   try {
     const result = await model.generateContent(prompt);
     const response = await result.response;
     const text = response.text();
-    const cleanedText = text.replace(/```json/g, '').replace(/```/g, '').trim();
 
-    const parsed = JSON.parse(cleanedText);
+    const jsonStr = text.replace(/```json/g, "").replace(/```/g, "").trim();
+    const parsed = JSON.parse(jsonStr);
 
-    const forecast: { timestamp: string; load: number }[] = [];
-    const currentTime = new Date(lastTimestamp);
-
-    for (const val of parsed.forecast) {
-      if (horizonUnit === 'hours') currentTime.setHours(currentTime.getHours() + 1);
-      else if (horizonUnit === 'days') currentTime.setDate(currentTime.getDate() + 1);
-      else if (horizonUnit === 'years') currentTime.setFullYear(currentTime.getFullYear() + 1);
-
-      const ts = currentTime.toISOString().slice(0, 16).replace('T', ' ');
-      forecast.push({ timestamp: ts, load: Number(val) });
-      if (forecast.length >= horizon) break;
+    if (!Array.isArray(parsed.forecast) || parsed.forecast.length !== req.forecastHorizon) {
+       throw new Error("Invalid forecast length from AI");
     }
 
     return {
-      forecast,
-      analysis: parsed.analysis || "N/A",
-      recommendations: parsed.recommendations || "N/A",
-      environmentalImpact: parsed.environmentalImpact || [],
-      expansion: parsed.expansion || { timeframe: "Unknown", capacityNeededMW: 0, reasoning: "N/A" },
-      maintenance: parsed.maintenance || []
+      forecast: parsed.forecast,
+      explanation: parsed.explanation
     };
 
   } catch (error) {
     console.error("Gemini API Error:", error);
-    throw error;
+    return generateFallbackForecast(req);
   }
+}
+
+function generateFallbackForecast(req: ForecastRequest): ForecastResult {
+  const lastVal = req.historicalData[req.historicalData.length - 1] || 100;
+  const forecast: number[] = [];
+
+  for(let i=0; i<req.forecastHorizon; i++) {
+    const hourOffset = i;
+    const seasonality = Math.sin((hourOffset / 24) * 2 * Math.PI) * (lastVal * 0.1);
+    const noise = (Math.random() - 0.5) * (lastVal * 0.05);
+    forecast.push(Math.max(0, lastVal + seasonality + noise));
+  }
+
+  return {
+    forecast,
+    explanation: "Fallback logic used (Gemini API unavailable or failed)."
+  };
 }
