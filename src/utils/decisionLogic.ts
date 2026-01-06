@@ -9,6 +9,13 @@ export interface GeneratorUnit {
   emissionFactor: number; // kg CO2 per MWh
 }
 
+export interface MaintenanceWindowConfig {
+  id: string;
+  start: string;
+  end: string;
+  reason: string;
+}
+
 export interface UnitCommitment {
   timeIndex: number;
   timestamp: string;
@@ -31,8 +38,9 @@ export interface MaintenanceSuggestion {
 /**
  * Determines which generator units should be ON based on predicted load.
  * Strategy: Environmental Priority Dispatch.
- * 1. Calculate renewable contribution first.
+ * 1. Calculate renewable contribution first (Solar/Wind/Hydro).
  * 2. Fill deficit with non-renewables based on marginal cost/emissions.
+ * 3. Recommendation: Turn OFF thermal units if Renewables suffice.
  */
 export function calculateUnitCommitment(
   predictedLoad: number[],
@@ -47,45 +55,55 @@ export function calculateUnitCommitment(
     const unitsOff: string[] = [];
     const target = load + reserveMargin;
 
-    // First: Prioritize Renewables
+    // 1. Filter & Sort
     const renewableUnits = units.filter(u => u.isRenewable);
-    const nonRenewableUnits = units.filter(u => !u.isRenewable)
-      .sort((a, b) => a.marginalCost - b.marginalCost); // Dispatch based on cost/efficiency
 
+    // Sort non-renewables: Lower emission -> Lower Cost
+    const nonRenewableUnits = units.filter(u => !u.isRenewable)
+      .sort((a, b) => {
+          if (a.emissionFactor !== b.emissionFactor) {
+              return a.emissionFactor - b.emissionFactor; // Greenest first
+          }
+          return a.marginalCost - b.marginalCost; // Then cheapest
+      });
+
+    // 2. Dispatch Renewables (Must Take / Priority)
     let renewableCapacity = 0;
     for (const unit of renewableUnits) {
-      // Note: In real scenarios, solar/wind capacity is weather-dependent.
-      // Here we assume availability is managed by the AI's forecast context.
+      // In a real system, we'd check availability factors here (wind speed, sun).
+      // Assuming availability is handled upstream or units represent *available* capacity.
       currentCapacity += unit.capacityMW;
       renewableCapacity += unit.capacityMW;
       unitsOn.push(unit.name);
     }
 
-    // Second: Fill deficit with Non-Renewables
+    // 3. Dispatch Non-Renewables to fill Gap
     for (const unit of nonRenewableUnits) {
       if (currentCapacity < target) {
         currentCapacity += unit.capacityMW;
         unitsOn.push(unit.name);
       } else {
+        // Shed this unit if possible
         unitsOff.push(unit.name);
       }
     }
 
-    const renewablePercentage = (renewableCapacity / (currentCapacity || 1)) * 100;
+    // Metrics
+    const renewablePercentage = currentCapacity > 0 ? (renewableCapacity / currentCapacity) * 100 : 0;
 
-    // Calculate environmental impact (very simplified estimate)
+    // Calculate environmental impact (kg CO2)
     const environmentalImpact = unitsOn.reduce((acc, name) => {
       const unit = units.find(u => u.name === name);
       if (!unit) return acc;
-      // In a real grid, output per unit is shared. Here we estimate impact 
-      // based on capacity share relative to load.
-      const estimatedOutput = (unit.capacityMW / currentCapacity) * load;
-      return acc + (estimatedOutput * unit.emissionFactor);
+      // Estimate actual output: if it's the marginal unit, it might not run full cap.
+      // But for simple commitment logic, we assume dispatch blocks.
+      // Refined: Pro-rate the last unit? No, keep simple block dispatch for MVP.
+      return acc + (unit.capacityMW * unit.emissionFactor);
     }, 0);
 
     return {
       timeIndex: idx,
-      timestamp: timestamps[idx],
+      timestamp: timestamps[idx] || `T+${idx}`,
       loadMW: load,
       unitsOn,
       unitsOff,
@@ -99,8 +117,6 @@ export function calculateUnitCommitment(
 
 /**
  * Identifies low-load periods suitable for maintenance.
- * Heuristic: Find contiguous periods where load is significantly lower than peak.
- * e.g., < 70% of peak load for at least N hours.
  */
 export function suggestMaintenance(
   load: number[],
@@ -127,16 +143,15 @@ export function suggestMaintenance(
       if (currentStartIdx !== null) {
         const duration = i - currentStartIdx;
         if (duration >= minDurationHours) {
-          // Calculate avg load
           let sum = 0;
           for (let k = currentStartIdx; k < i; k++) sum += load[k];
           const avg = sum / duration;
 
           suggestions.push({
-            startTimestamp: timestamps[currentStartIdx],
-            endTimestamp: timestamps[i - 1],
+            startTimestamp: timestamps[currentStartIdx] || `T+${currentStartIdx}`,
+            endTimestamp: timestamps[i - 1] || `T+${i-1}`,
             avgLoad: avg,
-            reason: `Load < ${(thresholdPercent * 100).toFixed(0)}% of peak (${maxLoad.toFixed(1)} MW)`
+            reason: `Load < ${(thresholdPercent * 100).toFixed(0)}% of peak`
           });
         }
         currentStartIdx = null;
@@ -144,21 +159,22 @@ export function suggestMaintenance(
     }
   }
 
-  // Check if ending in a low period
+  // Flush end
   if (currentStartIdx !== null) {
-    const duration = load.length - currentStartIdx;
-    if (duration >= minDurationHours) {
-      let sum = 0;
-      for (let k = currentStartIdx; k < load.length; k++) sum += load[k];
-      const avg = sum / duration;
+      const i = load.length;
+      const duration = i - currentStartIdx;
+       if (duration >= minDurationHours) {
+          let sum = 0;
+          for (let k = currentStartIdx; k < i; k++) sum += load[k];
+          const avg = sum / duration;
 
-      suggestions.push({
-        startTimestamp: timestamps[currentStartIdx],
-        endTimestamp: timestamps[load.length - 1],
-        avgLoad: avg,
-        reason: `Load < ${(thresholdPercent * 100).toFixed(0)}% of peak`
-      });
-    }
+          suggestions.push({
+            startTimestamp: timestamps[currentStartIdx] || `T+${currentStartIdx}`,
+            endTimestamp: timestamps[i - 1] || `T+${i-1}`,
+            avgLoad: avg,
+            reason: `Load < ${(thresholdPercent * 100).toFixed(0)}% of peak`
+          });
+        }
   }
 
   return suggestions;

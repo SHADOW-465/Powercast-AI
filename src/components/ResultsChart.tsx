@@ -1,240 +1,202 @@
-"use client";
-
-import React, { useMemo, useRef } from 'react';
+import { useMemo, useState } from 'react';
 import {
-    Chart as ChartJS,
-    CategoryScale,
-    LinearScale,
-    PointElement,
-    LineElement,
-    Title,
-    Tooltip,
-    Legend,
-    Filler,
-} from 'chart.js';
-import { Line } from 'react-chartjs-2';
-import { Activity, RotateCcw } from 'lucide-react';
-
-ChartJS.register(
-    CategoryScale,
-    LinearScale,
-    PointElement,
-    LineElement,
-    Title,
-    Tooltip,
-    Legend,
-    Filler
-);
+  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ReferenceArea
+} from 'recharts';
 
 interface ResultsChartProps {
-    history: { timestamp: string; load: number; originalLoad?: number }[];
-    forecast: { timestamp: string; load: number }[];
-    horizon: number;
-    horizonUnit: 'hours' | 'days' | 'years';
-    maintenanceWindows?: any[];
-    isLoading?: boolean;
+  history: any[];
+  forecast: number[];
+  horizon: number;
+  horizonUnit: 'hours' | 'days' | 'years';
+  isLoading: boolean;
 }
 
-export default function ResultsChart({
-    history = [],
-    forecast = [],
-    horizonUnit,
-    isLoading
-}: ResultsChartProps) {
-    const chartRef = useRef<any>(null);
+export default function ResultsChart({ history, forecast, horizonUnit, isLoading }: ResultsChartProps) {
 
-    React.useEffect(() => {
-        if (typeof window !== 'undefined') {
-            // eslint-disable-next-line @typescript-eslint/no-require-imports
-            const zoomPlugin = require('chartjs-plugin-zoom');
-            ChartJS.register(zoomPlugin);
-        }
-    }, []);
+  // Interaction State for Zooming
+  const [refAreaLeft, setRefAreaLeft] = useState<string | null>(null);
+  const [refAreaRight, setRefAreaRight] = useState<string | null>(null);
+  const [left, setLeft] = useState<string | 'dataMin'>('dataMin');
+  const [right, setRight] = useState<string | 'dataMax'>('dataMax');
 
-    const resetZoom = () => {
-        if (chartRef.current) {
-            chartRef.current.resetZoom();
-        }
-    };
+  // Chart Data Preparation
+  const chartData = useMemo(() => {
+    // Determine history slice based on simple heuristic if not zoomed
+    // If we have forecast, we want to emphasize it.
+    // Default view: Show last 50% history + Forecast
 
-    const data = useMemo(() => {
-        // Dynamic context slicing: 
-        // Hours: 48h context, Days: 30d context, Years: 2y context
-        let contextSize = 48;
-        if (horizonUnit === 'days') contextSize = 30;
-        else if (horizonUnit === 'years') contextSize = 2;
+    // Normalize History
+    const normalizedHistory = history.map((point: any, index: number) => ({
+      name: point.timestamp || `T-${history.length - index}`,
+      load: typeof point === 'object' ? (point.value || point.Load_MW) : point,
+      forecast: null,
+      type: 'history',
+      index: index
+    }));
 
+    const lastHistoryIdx = normalizedHistory.length;
 
-        const labels = [
-            ...history.map(d => d.timestamp), // Include FULL history for panning
-            ...forecast.map(d => d.timestamp)
-        ];
+    // Normalize Forecast
+    const normalizedForecast = forecast.map((val, index) => {
+      // Fix for "Years" display logic if needed
+      let label = `+${index + 1}${horizonUnit[0]}`;
+      if (horizonUnit === 'years') {
+         // If "years", assuming index is year offset?
+         // Or if input was hours and we selected years?
+         // Let's stick to the relative label for now, but formatted nicely.
+         label = `Y+${index + 1}`;
+      }
 
-        const fullHistoryLength = history.length;
-        const forecastLength = forecast.length;
+      return {
+        name: label,
+        load: null, // continuous line gap?
+        forecast: val,
+        type: 'forecast',
+        index: lastHistoryIdx + index
+      };
+    });
 
-        const historicalDataset = {
-            label: 'Historical Load',
-            data: [
-                ...history.map(d => d.originalLoad || d.load),
-                ...new Array(forecastLength).fill(null)
-            ],
-            borderColor: '#3B82F6',
-            backgroundColor: 'rgba(59, 130, 246, 0.1)',
-            borderWidth: 2,
-            pointRadius: 0,
-            tension: 0.4,
-        };
+    // To connect the lines, we need the last history point to also be the first forecast point (visually)
+    // or Recharts will leave a gap.
+    if (normalizedHistory.length > 0 && normalizedForecast.length > 0) {
+        const lastHist = normalizedHistory[normalizedHistory.length - 1];
+        normalizedForecast.unshift({
+            name: lastHist.name,
+            load: null,
+            forecast: lastHist.load, // Connect point
+            type: 'forecast',
+            index: lastHistoryIdx - 1
+        });
+    }
 
-        const smoothedDataset = {
-            label: 'Smoothed Load',
-            data: [
-                ...history.map(d => d.load),
-                ...new Array(forecastLength).fill(null)
-            ],
-            borderColor: '#10B981',
-            borderWidth: 2,
-            borderDash: [5, 5],
-            pointRadius: 0,
-            tension: 0.4,
-        };
+    return [...normalizedHistory, ...normalizedForecast];
+  }, [history, forecast, horizonUnit]);
 
-        const forecastDataset = {
-            label: 'Predicted Load',
-            data: [
-                ...new Array(Math.max(0, fullHistoryLength - 1)).fill(null),
-                history[fullHistoryLength - 1]?.load || null,
-                ...forecast.map(d => d.load)
-            ],
-            borderColor: '#EF4444', // RED (MANDATORY)
-            backgroundColor: 'rgba(239, 68, 68, 0.1)',
-            borderWidth: 3,
-            pointRadius: 0,
-            tension: 0.4,
-            fill: true,
-        };
+  // Zoom Logic
+  const zoom = () => {
+    if (refAreaLeft === refAreaRight || refAreaRight === null || refAreaLeft === null) {
+      setRefAreaLeft(null);
+      setRefAreaRight(null);
+      return;
+    }
 
-        return { labels, datasets: [historicalDataset, smoothedDataset, forecastDataset] };
-    }, [history, forecast, horizonUnit]);
+    // Identify direction
+    // Recharts dataKey "name" implies categorical axis usually, but we need indices for reliable direction check
+    // We'll rely on the order in the data array found by name.
 
-    const labels = data.labels;
+    const leftIndex = chartData.findIndex(d => d.name === refAreaLeft);
+    const rightIndex = chartData.findIndex(d => d.name === refAreaRight);
 
-    const options = {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: {
-            legend: {
-                position: 'bottom' as const,
-                labels: {
-                    padding: 20,
-                    usePointStyle: true,
-                    font: { size: 10, weight: 'bold' as any, family: 'Inter' }
-                }
-            },
-            tooltip: {
-                mode: 'index' as const,
-                intersect: false,
-            },
-            zoom: {
-                pan: {
-                    enabled: true,
-                    mode: 'x' as const,
-                    threshold: 5,
-                },
-                zoom: {
-                    wheel: { enabled: true },
-                    pinch: { enabled: true },
-                    drag: {
-                        enabled: true,
-                        backgroundColor: 'rgba(59, 130, 246, 0.1)',
-                        borderColor: 'rgba(59, 130, 246, 0.4)',
-                        borderWidth: 1,
-                    },
-                    mode: 'x' as const,
-                }
-            }
-        },
-        scales: {
-            x: {
-                // Focus on the end of history + forecast
-                min: history.length > 12 ? labels[Math.max(0, history.length - 12)] : undefined,
-                title: {
-                    display: true,
-                    text: `Time (${horizonUnit.charAt(0).toUpperCase() + horizonUnit.slice(1)})`,
-                    font: { size: 10, weight: 'bold' as any }
-                },
-                grid: { display: false },
-                ticks: {
-                    maxRotation: 0,
-                    autoSkip: true,
-                    maxTicksLimit: 12,
-                    font: { size: 9 },
-                    callback: function (value: any, index: number): string {
-                        const label = labels[index] || '';
-                        if (horizonUnit === 'years') return label.split('-')[0]; // Just year
-                        if (horizonUnit === 'days') return label.split(' ')[0].split('-').slice(1).join('/'); // MM/DD/YY -> MM/DD
-                        return (label as string).split(' ')[1] || (label as string); // HH:mm
-                    }
-                }
-            },
-            y: {
-                title: {
-                    display: true,
-                    text: 'Power Demand (MW)',
-                    font: { size: 10, weight: 'bold' as any }
-                },
-                grid: { color: 'rgba(0,0,0,0.05)' },
-                ticks: { font: { size: 9 } }
-            }
-        }
-    };
+    // Custom Requirement:
+    // Drag Right-to-Left (Right Index < Left Index? No, Start on Right, Move Left)
+    // Wait, mouseDown is 'Left', mouseUp is 'Right' in time sequence?
+    // Let's define by drag direction on screen.
 
+    // In Recharts:
+    // refAreaLeft is the starting point (MouseDown)
+    // refAreaRight is the ending point (MouseUp)
+
+    if (leftIndex > rightIndex) {
+        // User dragged from Right (later time) to Left (earlier time)
+        // Action: "Magnify / Accurate" -> Zoom In
+        setLeft(refAreaRight);
+        setRight(refAreaLeft);
+    } else {
+        // User dragged from Left to Right
+        // Action: "Vice Versa" -> Zoom Out / Show Previous Data
+        setLeft('dataMin');
+        setRight('dataMax');
+    }
+
+    setRefAreaLeft(null);
+    setRefAreaRight(null);
+  };
+
+  if (isLoading) {
     return (
-        <div className="neo-card w-full h-full p-8 flex flex-col relative overflow-hidden">
-            <div className="flex justify-between items-center mb-6">
-                <div className="flex flex-col gap-1">
-                    <h2 className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Dynamic Load Forecast Visualization</h2>
-                    <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Drag to zoom • Scroll to magnify • Drag pan</p>
-                </div>
-
-                <div className="flex items-center gap-3">
-                    <button
-                        onClick={resetZoom}
-                        className="neo-btn py-1.5 px-3 text-[9px] font-black uppercase tracking-widest text-slate-500 hover:text-blue-500 flex items-center gap-2"
-                    >
-                        <RotateCcw size={12} />
-                        Reset View
-                    </button>
-                    {isLoading && (
-                        <div className="flex items-center gap-2">
-                            <div className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-ping"></div>
-                            <span className="text-[9px] font-bold text-blue-500 uppercase">Updating</span>
-                        </div>
-                    )}
-                </div>
-            </div>
-
-            <div className="flex-1 min-h-[350px] relative">
-                {!isLoading && forecast.length > 0 && (
-                    <div
-                        className="absolute top-0 right-0 h-[82%] bg-red-400/5 border-l border-dashed border-red-200 pointer-events-none flex items-start justify-center pt-2"
-                        style={{ width: `${(forecast.length / (history.slice(-48).length + forecast.length)) * 100}%` }}
-                    >
-                        <span className="text-[9px] font-black text-red-300 uppercase tracking-[0.2em]">Forecast Region</span>
-                    </div>
-                )}
-
-                {history.length > 0 ? (
-                    <Line ref={chartRef} data={data} options={options} />
-                ) : (
-                    <div className="h-full flex flex-col items-center justify-center opacity-40">
-                        <div className="w-16 h-16 neo-inset rounded-full flex items-center justify-center mb-4">
-                            <Activity size={32} className="text-slate-300" />
-                        </div>
-                        <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Awaiting System Input</p>
-                    </div>
-                )}
-            </div>
+      <div className="neo-card w-full h-full flex items-center justify-center">
+        <div className="animate-pulse flex flex-col items-center">
+           <div className="h-4 w-32 bg-slate-200 rounded mb-2"></div>
+           <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">Generating AI Model...</span>
         </div>
+      </div>
     );
+  }
+
+  if (history.length === 0 && forecast.length === 0) {
+    return (
+       <div className="neo-card w-full h-full flex items-center justify-center">
+        <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">No Data Loaded</span>
+      </div>
+    );
+  }
+
+  return (
+    <div className="neo-card w-full h-full p-4 relative select-none">
+      <div className="absolute top-4 left-6 z-10 flex flex-col">
+        <h3 className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Load Forecast Visualization</h3>
+        <p className="text-[9px] text-slate-300 font-bold mt-1">
+            Drag Right-to-Left to Zoom • Left-to-Right to Reset
+        </p>
+      </div>
+
+      <ResponsiveContainer width="100%" height="100%">
+        <LineChart
+            data={chartData}
+            margin={{ top: 40, right: 30, left: 0, bottom: 0 }}
+            onMouseDown={(e) => e && e.activeLabel && setRefAreaLeft(e.activeLabel)}
+            onMouseMove={(e) => refAreaLeft && e && e.activeLabel && setRefAreaRight(e.activeLabel)}
+            onMouseUp={zoom}
+        >
+          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" />
+          <XAxis
+            dataKey="name"
+            tick={{fontSize: 10, fill: '#94A3B8', fontWeight: 700}}
+            axisLine={false}
+            tickLine={false}
+            domain={[left, right]}
+            allowDataOverflow
+          />
+          <YAxis
+             tick={{fontSize: 10, fill: '#94A3B8', fontWeight: 700}}
+             axisLine={false}
+             tickLine={false}
+             domain={['auto', 'auto']}
+          />
+          <Tooltip
+            contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)' }}
+            itemStyle={{ fontSize: '12px', fontWeight: 600, color: '#475569' }}
+          />
+          <Legend wrapperStyle={{ fontSize: '10px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }} />
+
+          <Line
+            type="monotone"
+            dataKey="load"
+            stroke="#3B82F6"
+            strokeWidth={3}
+            dot={false}
+            name="Historical Load"
+            animationDuration={300}
+            activeDot={{ r: 6, strokeWidth: 0 }}
+          />
+          <Line
+            type="monotone"
+            dataKey="forecast"
+            stroke="#EF4444"
+            strokeWidth={3}
+            dot={false}
+            strokeDasharray="5 5"
+            name="AI Prediction"
+            animationDuration={300}
+            activeDot={{ r: 6, strokeWidth: 0 }}
+          />
+
+          {refAreaLeft && refAreaRight ? (
+            <ReferenceArea x1={refAreaLeft} x2={refAreaRight} strokeOpacity={0.3} fill="#3B82F6" fillOpacity={0.1} />
+          ) : null}
+
+        </LineChart>
+      </ResponsiveContainer>
+    </div>
+  );
 }

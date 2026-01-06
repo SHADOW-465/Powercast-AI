@@ -1,81 +1,90 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { savitzkyGolaySmooth, backtestAndOptimize } from '@/utils/signalProcessing';
-import { calculateUnitCommitment, suggestMaintenance, GeneratorUnit } from '@/utils/decisionLogic';
 import { generateForecast } from '@/utils/gemini';
-import { fetchExogenousFactors } from '@/utils/weatherService';
+import { adaptiveSmooth } from '@/utils/signalProcessing';
+import { fetchCurrentWeather } from '@/utils/weatherService';
+import { calculateUnitCommitment, suggestMaintenance } from '@/utils/decisionLogic';
 
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
     const {
       historicalData,
-      horizon,
-      horizonUnit,
+      timestamps,
+      forecastHorizon = 24,
+      location = "New York, NY", // Default location
       units
     } = body;
 
-    const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey) {
-      return NextResponse.json({ error: "Server configuration error: API Key missing" }, { status: 500 });
-    }
-
-    if (!historicalData || !Array.isArray(historicalData)) {
+    if (!historicalData || !Array.isArray(historicalData) || historicalData.length === 0) {
       return NextResponse.json({ error: "Invalid historical data" }, { status: 400 });
     }
 
-    // 1. Adaptive Signal Quality Control
-    const rawLoads = historicalData.map((d: any) => d.load);
-    const { windowSize, degree, lookback } = backtestAndOptimize(rawLoads);
-
-    // 2. Preprocessing: Smoothing with optimized parameters
-    const smoothedLoads = savitzkyGolaySmooth(rawLoads, windowSize, degree);
-
-    const processedHistory = historicalData.map((d: any, i: number) => ({
-      timestamp: d.timestamp,
-      load: smoothedLoads[i],
-      originalLoad: d.load
-    })).slice(-lookback); // Adaptive Context Window
-
-    console.log(`[Adaptive Controller] Optimized: Window=${windowSize}, Degree=${degree}, Lookback=${lookback}`);
-
-    // 2. Fetch Exogenous factors (Weather/Environmental)
-    const { location = "Global Grid" } = body;
-    let exogenous;
+    // 1. Fetch Real-Time Exogenous Factors (Weather)
+    let weatherContext = undefined;
     try {
-      exogenous = await fetchExogenousFactors(location);
+      const weather = await fetchCurrentWeather(location);
+      // Map to context structure expected by Gemini
+      weatherContext = {
+        temperature: [weather.temperature], // Mocking array for now
+        cloudCover: [weather.cloudCover],
+        windSpeed: [weather.windSpeed]
+      };
     } catch (err) {
-      console.warn("Exogenous fetch failed, continuing without weather data.");
+      console.warn("Failed to fetch weather data:", err);
     }
 
-    // 3. Forecasting (Gemini)
-    let aiResult;
-    try {
-      aiResult = await generateForecast(apiKey, processedHistory, horizon, horizonUnit, units, exogenous);
-    } catch (error: any) {
-      return NextResponse.json({ error: "Forecasting failed: " + error.message }, { status: 500 });
+    // 2. Adaptive Signal Processing
+    const smoothedData = adaptiveSmooth(historicalData);
+
+    // 3. Call Gemini for forecasting
+    const forecastResult = await generateForecast({
+      historicalData: smoothedData,
+      timestamps,
+      forecastHorizon,
+      location,
+      context: weatherContext
+    });
+
+    // 4. Calculate Unit Commitment & Maintenance
+    const generatorFleet = units || [];
+
+    // Generate future timestamps if not present
+    // Simple hourly increment
+    const futureTimestamps = [];
+    const lastTime = timestamps ? new Date(timestamps[timestamps.length-1]).getTime() : Date.now();
+    for (let i = 1; i <= forecastResult.forecast.length; i++) {
+        futureTimestamps.push(new Date(lastTime + i * 3600000).toISOString());
     }
 
-    const { forecast, analysis, recommendations, expansion, maintenance, environmentalImpact } = aiResult;
+    const unitCommitment = calculateUnitCommitment(
+        forecastResult.forecast,
+        futureTimestamps,
+        generatorFleet
+    );
 
-    const forecastLoads = forecast.map(f => f.load);
-    const forecastTimestamps = forecast.map(f => f.timestamp);
-
-    // 4. Hybrid Dispatch Logic (Environmental Priority)
-    const unitCommitment = calculateUnitCommitment(forecastLoads, forecastTimestamps, units);
+    const maintenance = suggestMaintenance(
+        forecastResult.forecast,
+        futureTimestamps
+    );
 
     return NextResponse.json({
-      processedHistory,
-      forecast,
-      analysis,
-      recommendations,
-      expansion,
+      originalData: historicalData,
+      smoothedData,
+      forecast: forecastResult.forecast,
+      explanation: forecastResult.explanation,
+      confidenceIntervals: forecastResult.confidenceIntervals,
       unitCommitment,
       maintenance,
-      environmentalScore: environmentalImpact // AI estimated green score
+      analysis: "AI Analysis: " + (forecastResult.explanation || "System stable."),
+      recommendations: ["Shift non-essential load to midday if Solar available.", "Monitor thermal unit efficiency."],
+      expansion: ["Consider +50MW Battery Storage for peak shaving."]
     });
 
   } catch (error: any) {
-    console.error("API Error:", error);
-    return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
+    console.error("Forecast API Error:", error);
+    return NextResponse.json(
+      { error: error.message || "Internal Server Error" },
+      { status: 500 }
+    );
   }
 }
