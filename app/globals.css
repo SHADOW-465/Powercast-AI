@@ -3,20 +3,20 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 :root {
-  /* User requested solid pale off-white/light grey */
   --background: #F0F2F5;
-  --foreground: #2D3748; /* Dark charcoal */
-
+  --foreground: #2D3748;
   --shadow-light: #ffffff;
-  --shadow-dark: #d1d9e6; /* Tuned for F0F2F5 */
+  --shadow-dark: #D1D9E6;
+  --neo-blue: #3B82F6;
+  --neo-red: #EF4444;
+  --neo-green: #10B981;
 }
 
-/* Dark mode overrides (optional, but good for completeness if system switches) */
 .dark {
-  --background: #2D3748;
+  --background: #1A202C;
   --foreground: #F0F2F5;
-  --shadow-light: #3a4659;
-  --shadow-dark: #1a202c;
+  --shadow-light: #2D3748;
+  --shadow-dark: #0A0E14;
 }
 
 body {
@@ -27,80 +27,96 @@ body {
   padding: 0;
 }
 
-/* Neomorphic Utilities */
 @layer components {
-  /* Standard Extruded Card/Button */
+  /* Elevated Neomorphic Card */
   .neo-card {
-    @apply bg-[var(--background)] rounded-2xl;
-    box-shadow:
-      -6px -6px 14px var(--shadow-light),
-      6px 6px 14px var(--shadow-dark);
-  }
-
-  /* Hover State for clickable extruded elements */
-  .neo-card-hover:hover {
-    transform: translateY(-1px);
+    @apply bg-[var(--background)] rounded-2xl p-6;
     box-shadow:
       -8px -8px 16px var(--shadow-light),
       8px 8px 16px var(--shadow-dark);
-    transition: all 0.3s ease;
   }
 
-  /* Pressed / Active State (Inset) */
+  /* Inset Neomorphic Card (for inputs/fields) */
   .neo-inset {
     @apply bg-[var(--background)] rounded-xl;
     box-shadow:
-      inset 6px 6px 10px var(--shadow-dark),
-      inset -6px -6px 10px var(--shadow-light);
+      inset 4px 4px 8px var(--shadow-dark),
+      inset -4px -4px 8px var(--shadow-light);
   }
 
-  /* Specific Button Style */
+  /* Neomorphic Button */
   .neo-btn {
-    @apply bg-[var(--background)] text-[var(--foreground)] font-bold py-3 px-6 rounded-xl flex items-center justify-center transition-all duration-200 cursor-pointer;
+    @apply font-bold py-2.5 px-6 rounded-xl transition-all duration-300 flex items-center justify-center gap-2;
     box-shadow:
-      -6px -6px 14px var(--shadow-light),
-      6px 6px 14px var(--shadow-dark);
+      -5px -5px 10px var(--shadow-light),
+      5px 5px 10px var(--shadow-dark);
   }
 
   .neo-btn:active {
     box-shadow:
-      inset 4px 4px 8px var(--shadow-dark),
-      inset -4px -4px 8px var(--shadow-light);
+      inset 3px 3px 6px var(--shadow-dark),
+      inset -3px -3px 6px var(--shadow-light);
     transform: translateY(1px);
   }
 
   .neo-btn-primary {
-    @apply text-blue-600;
-  }
-
-  /* Range Slider Thumb & Track Customization */
-  input[type=range] {
-    -webkit-appearance: none;
-    background: transparent;
-  }
-
-  input[type=range]::-webkit-slider-thumb {
-    -webkit-appearance: none;
-    height: 20px;
-    width: 20px;
-    border-radius: 50%;
-    background: var(--background);
+    @apply bg-blue-500 text-white border-none;
     box-shadow:
-      -2px -2px 5px var(--shadow-light),
-      2px 2px 5px var(--shadow-dark);
-    cursor: pointer;
-    margin-top: -8px;
-    border: 2px solid #F0F2F5; /* Matches bg */
+      -5px -5px 10px var(--shadow-light),
+      5px 5px 10px var(--shadow-dark);
   }
 
-  input[type=range]::-webkit-slider-runnable-track {
-    width: 100%;
-    height: 6px;
-    cursor: pointer;
-    background: var(--background);
-    border-radius: 999px;
+  .neo-btn-primary:hover {
+    @apply bg-blue-600;
+  }
+
+  /* Glassmorphic Overlay for specific highlights */
+  .glass-highlight {
+    background: rgba(255, 255, 255, 0.4);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+  }
+
+  /* Status Indicator Neomorphism */
+  .neo-status-dot {
+    @apply w-3 h-3 rounded-full;
     box-shadow:
-      inset 2px 2px 5px var(--shadow-dark),
-      inset -2px -2px 5px var(--shadow-light);
+      -1px -1px 3px var(--shadow-light),
+      1px 1px 3px var(--shadow-dark);
+  }
+
+  /* Input fields neomorphism */
+  .neo-input {
+    @apply bg-[var(--background)] border-none px-4 py-2 outline-none rounded-lg text-sm transition-all;
+    box-shadow:
+      inset 3px 3px 6px var(--shadow-dark),
+      inset -3px -3px 6px var(--shadow-light);
+  }
+
+  /* Tabs/Pills Neomorphism */
+  .neo-pill {
+    @apply px-4 py-1.5 rounded-full text-xs font-bold uppercase tracking-widest transition-all;
+  }
+  
+  .neo-pill-active {
+    @apply bg-blue-500 text-white;
+    box-shadow:
+      -4px -4px 8px var(--shadow-light),
+      4px 4px 8px var(--shadow-dark);
+  }
+
+  .neo-pill-inactive {
+    @apply text-slate-400;
+  }
+
+  /* Scrollbar Styling */
+  ::-webkit-scrollbar {
+    width: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    @apply bg-transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    @apply bg-slate-300 rounded-full;
   }
 }

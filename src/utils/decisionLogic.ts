@@ -2,6 +2,11 @@ export interface GeneratorUnit {
   id: string;
   name: string;
   capacityMW: number;
+  type: 'solar' | 'wind' | 'hydro' | 'thermal' | 'nuclear' | 'other';
+  isRenewable: boolean;
+  status: 'ON' | 'OFF';
+  marginalCost: number;
+  emissionFactor: number; // kg CO2 per MWh
 }
 
 export interface UnitCommitment {
@@ -12,6 +17,8 @@ export interface UnitCommitment {
   unitsOff: string[];
   totalCapacityOn: number;
   surplus: number;
+  renewablePercentage: number;
+  environmentalImpact: number; // estimated aggregate emission
 }
 
 export interface MaintenanceSuggestion {
@@ -23,12 +30,9 @@ export interface MaintenanceSuggestion {
 
 /**
  * Determines which generator units should be ON based on predicted load.
- * Strategy: Turn on units until capacity > load + reserve (optional).
- * Here we use a simple greedy approach: Sort units by capacity (descending)
- * or order provided, and turn on enough to meet load.
- *
- * Note: Real unit commitment is optimization (MIP), here we use a rule-based heuristic
- * as per "Simple, Explainable" requirement.
+ * Strategy: Environmental Priority Dispatch.
+ * 1. Calculate renewable contribution first.
+ * 2. Fill deficit with non-renewables based on marginal cost/emissions.
  */
 export function calculateUnitCommitment(
   predictedLoad: number[],
@@ -37,18 +41,28 @@ export function calculateUnitCommitment(
   reserveMargin: number = 0 // MW
 ): UnitCommitment[] {
 
-  // Sort units? Let's assume user input order is preference order (base load first).
-  // Or typically base load (cheaper/larger) first.
-  // We will respect the order in the list.
-
   return predictedLoad.map((load, idx) => {
     let currentCapacity = 0;
     const unitsOn: string[] = [];
     const unitsOff: string[] = [];
     const target = load + reserveMargin;
 
-    // Greedy allocation
-    for (const unit of units) {
+    // First: Prioritize Renewables
+    const renewableUnits = units.filter(u => u.isRenewable);
+    const nonRenewableUnits = units.filter(u => !u.isRenewable)
+      .sort((a, b) => a.marginalCost - b.marginalCost); // Dispatch based on cost/efficiency
+
+    let renewableCapacity = 0;
+    for (const unit of renewableUnits) {
+      // Note: In real scenarios, solar/wind capacity is weather-dependent.
+      // Here we assume availability is managed by the AI's forecast context.
+      currentCapacity += unit.capacityMW;
+      renewableCapacity += unit.capacityMW;
+      unitsOn.push(unit.name);
+    }
+
+    // Second: Fill deficit with Non-Renewables
+    for (const unit of nonRenewableUnits) {
       if (currentCapacity < target) {
         currentCapacity += unit.capacityMW;
         unitsOn.push(unit.name);
@@ -57,7 +71,17 @@ export function calculateUnitCommitment(
       }
     }
 
-    // If all units ON and still not enough, well, we tried. All are ON.
+    const renewablePercentage = (renewableCapacity / (currentCapacity || 1)) * 100;
+
+    // Calculate environmental impact (very simplified estimate)
+    const environmentalImpact = unitsOn.reduce((acc, name) => {
+      const unit = units.find(u => u.name === name);
+      if (!unit) return acc;
+      // In a real grid, output per unit is shared. Here we estimate impact 
+      // based on capacity share relative to load.
+      const estimatedOutput = (unit.capacityMW / currentCapacity) * load;
+      return acc + (estimatedOutput * unit.emissionFactor);
+    }, 0);
 
     return {
       timeIndex: idx,
@@ -66,7 +90,9 @@ export function calculateUnitCommitment(
       unitsOn,
       unitsOff,
       totalCapacityOn: currentCapacity,
-      surplus: currentCapacity - load
+      surplus: currentCapacity - load,
+      renewablePercentage: Math.min(100, renewablePercentage),
+      environmentalImpact
     };
   });
 }
@@ -122,16 +148,16 @@ export function suggestMaintenance(
   if (currentStartIdx !== null) {
     const duration = load.length - currentStartIdx;
     if (duration >= minDurationHours) {
-        let sum = 0;
-        for (let k = currentStartIdx; k < load.length; k++) sum += load[k];
-        const avg = sum / duration;
+      let sum = 0;
+      for (let k = currentStartIdx; k < load.length; k++) sum += load[k];
+      const avg = sum / duration;
 
-        suggestions.push({
-          startTimestamp: timestamps[currentStartIdx],
-          endTimestamp: timestamps[load.length - 1],
-          avgLoad: avg,
-          reason: `Load < ${(thresholdPercent * 100).toFixed(0)}% of peak`
-        });
+      suggestions.push({
+        startTimestamp: timestamps[currentStartIdx],
+        endTimestamp: timestamps[load.length - 1],
+        avgLoad: avg,
+        reason: `Load < ${(thresholdPercent * 100).toFixed(0)}% of peak`
+      });
     }
   }
 

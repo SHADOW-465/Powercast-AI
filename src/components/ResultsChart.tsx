@@ -1,239 +1,239 @@
 "use client";
 
-import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ReferenceArea, Label } from 'recharts';
-import { ZoomIn, ZoomOut, Maximize2 } from 'lucide-react';
-import { useMemo } from 'react';
+import React, { useMemo, useRef } from 'react';
+import {
+    Chart as ChartJS,
+    CategoryScale,
+    LinearScale,
+    PointElement,
+    LineElement,
+    Title,
+    Tooltip,
+    Legend,
+    Filler,
+} from 'chart.js';
+import { Line } from 'react-chartjs-2';
+import { Zap, Activity, RotateCcw } from 'lucide-react';
+
+ChartJS.register(
+    CategoryScale,
+    LinearScale,
+    PointElement,
+    LineElement,
+    Title,
+    Tooltip,
+    Legend,
+    Filler
+);
 
 interface ResultsChartProps {
-  history: any[];
-  forecast: any[];
-  horizon: number;
-  horizonUnit: 'hours' | 'days' | 'years';
-  maintenanceWindows?: any[];
+    history: { timestamp: string; load: number; originalLoad?: number }[];
+    forecast: { timestamp: string; load: number }[];
+    horizon: number;
+    horizonUnit: 'hours' | 'days' | 'years';
+    maintenanceWindows?: any[];
+    isLoading?: boolean;
 }
 
-export default function ResultsChart({ history, forecast, horizon, horizonUnit, maintenanceWindows = [] }: ResultsChartProps) {
+export default function ResultsChart({
+    history = [],
+    forecast = [],
+    horizonUnit,
+    isLoading
+}: ResultsChartProps) {
+    const chartRef = useRef<any>(null);
 
-  // Safe data preparation
-  const data = useMemo(() => {
-      const safeHistory = Array.isArray(history) ? history : [];
-      const safeForecast = Array.isArray(forecast) ? forecast : [];
+    React.useEffect(() => {
+        if (typeof window !== 'undefined') {
+            const zoomPlugin = require('chartjs-plugin-zoom');
+            ChartJS.register(zoomPlugin);
+        }
+    }, []);
 
-      // Map History
-      const historyTail = safeHistory.slice(-48).map(d => ({
-        timestamp: d.timestamp,
-        actual: isNaN(d.originalLoad) ? null : d.originalLoad,
-        smoothed: isNaN(d.load) ? null : d.load,
-        predicted: null
-      }));
+    const resetZoom = () => {
+        if (chartRef.current) {
+            chartRef.current.resetZoom();
+        }
+    };
 
-      // Map Forecast
-      const forecastData = safeForecast.map(d => ({
-        timestamp: d.timestamp,
-        actual: null,
-        smoothed: null,
-        predicted: isNaN(d.load) ? null : d.load
-      }));
+    const data = useMemo(() => {
+        // Dynamic context slicing: 
+        // Hours: 48h context, Days: 30d context, Years: 2y context
+        let contextSize = 48;
+        if (horizonUnit === 'days') contextSize = 30;
+        else if (horizonUnit === 'years') contextSize = 2;
 
-      // Create Bridge Point
-      if (historyTail.length > 0 && forecastData.length > 0) {
-          const lastHist = historyTail[historyTail.length - 1];
-          if (lastHist.smoothed !== null) {
-              const bridge = {
-                  timestamp: lastHist.timestamp,
-                  actual: null,
-                  smoothed: lastHist.smoothed,
-                  predicted: lastHist.smoothed // Start prediction line from smoothed history end
-              };
-              forecastData.unshift(bridge);
-          }
-      }
+        const historyContext = history.slice(-contextSize);
+        const labels = [
+            ...history.map(d => d.timestamp), // Include FULL history for panning
+            ...forecast.map(d => d.timestamp)
+        ];
 
-      return [...historyTail, ...forecastData];
-  }, [history, forecast]);
+        const fullHistoryLength = history.length;
+        const forecastLength = forecast.length;
 
-  const startForecastIndex = data.findIndex(d => d.predicted !== null);
+        const historicalDataset = {
+            label: 'Historical Load',
+            data: [
+                ...history.map(d => d.originalLoad || d.load),
+                ...new Array(forecastLength).fill(null)
+            ],
+            borderColor: '#3B82F6',
+            backgroundColor: 'rgba(59, 130, 246, 0.1)',
+            borderWidth: 2,
+            pointRadius: 0,
+            tension: 0.4,
+        };
 
-  const formatXAxis = (val: string, index: number) => {
-      if (!val) return '';
+        const smoothedDataset = {
+            label: 'Smoothed Load',
+            data: [
+                ...history.map(d => d.load),
+                ...new Array(forecastLength).fill(null)
+            ],
+            borderColor: '#10B981',
+            borderWidth: 2,
+            borderDash: [5, 5],
+            pointRadius: 0,
+            tension: 0.4,
+        };
 
-      // Dynamic X-axis adaptation logic
-      if (horizonUnit === 'hours') {
-          // Just time: HH:mm
-          return val.split(' ')[1] || val;
-      } else if (horizonUnit === 'days') {
-          // Date: MM-DD
-          const parts = val.split(' ')[0].split('-');
-          return parts.length >= 3 ? `${parts[1]}-${parts[2]}` : val;
-      } else if (horizonUnit === 'years') {
-          // Year: YYYY
-          const parts = val.split('-');
-          return parts[0];
-      }
-      return val;
-  };
+        const forecastDataset = {
+            label: 'Predicted Load',
+            data: [
+                ...new Array(Math.max(0, fullHistoryLength - 1)).fill(null),
+                history[fullHistoryLength - 1]?.load || null,
+                ...forecast.map(d => d.load)
+            ],
+            borderColor: '#EF4444', // RED (MANDATORY)
+            backgroundColor: 'rgba(239, 68, 68, 0.1)',
+            borderWidth: 3,
+            pointRadius: 0,
+            tension: 0.4,
+            fill: true,
+        };
 
-  const getXAxisLabel = () => {
-      if (horizonUnit === 'hours') return "Time (Hours)";
-      if (horizonUnit === 'days') return "Time (Days)";
-      if (horizonUnit === 'years') return "Time (Years)";
-      return "Time";
-  };
+        return { labels, datasets: [historicalDataset, smoothedDataset, forecastDataset] };
+    }, [history, forecast, horizonUnit]);
 
-  if (data.length === 0) {
-      return (
-        <div className="neo-card w-full h-full p-6 flex flex-col items-center justify-center">
-            <p className="text-slate-400 text-sm">No data available for visualization.</p>
-        </div>
-      );
-  }
+    const labels = data.labels;
 
-  return (
-    <div className="neo-card w-full h-full p-6 relative flex flex-col min-h-[400px]">
-        {/* Header inside the chart card */}
-        <div className="flex justify-between items-start mb-4 z-10">
-            <h2 className="text-xs font-bold text-slate-500 uppercase tracking-wider">Dynamic Load Forecast</h2>
+    const options = {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            legend: {
+                position: 'bottom' as const,
+                labels: {
+                    padding: 20,
+                    usePointStyle: true,
+                    font: { size: 10, weight: 'bold' as any, family: 'Inter' }
+                }
+            },
+            tooltip: {
+                mode: 'index' as const,
+                intersect: false,
+            },
+            zoom: {
+                pan: {
+                    enabled: true,
+                    mode: 'x' as const,
+                    threshold: 5,
+                },
+                zoom: {
+                    wheel: { enabled: true },
+                    pinch: { enabled: true },
+                    drag: {
+                        enabled: true,
+                        backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                        borderColor: 'rgba(59, 130, 246, 0.4)',
+                        borderWidth: 1,
+                    },
+                    mode: 'x' as const,
+                }
+            }
+        },
+        scales: {
+            x: {
+                // Focus on the end of history + forecast
+                min: history.length > 12 ? labels[Math.max(0, history.length - 12)] : undefined,
+                title: {
+                    display: true,
+                    text: `Time (${horizonUnit.charAt(0).toUpperCase() + horizonUnit.slice(1)})`,
+                    font: { size: 10, weight: 'bold' as any }
+                },
+                grid: { display: false },
+                ticks: {
+                    maxRotation: 0,
+                    autoSkip: true,
+                    maxTicksLimit: 12,
+                    font: { size: 9 },
+                    callback: function (value: any, index: number): string {
+                        const label = labels[index] || '';
+                        if (horizonUnit === 'years') return label.split('-')[0]; // Just year
+                        if (horizonUnit === 'days') return label.split(' ')[0].split('-').slice(1).join('/'); // MM/DD/YY -> MM/DD
+                        return (label as string).split(' ')[1] || (label as string); // HH:mm
+                    }
+                }
+            },
+            y: {
+                title: {
+                    display: true,
+                    text: 'Power Demand (MW)',
+                    font: { size: 10, weight: 'bold' as any }
+                },
+                grid: { color: 'rgba(0,0,0,0.05)' },
+                ticks: { font: { size: 9 } }
+            }
+        }
+    };
 
-            <div className="flex items-center gap-2">
-                <div className="neo-btn px-3 py-1 text-[10px] gap-2 cursor-pointer hover:text-blue-500">
-                    <Maximize2 className="w-3 h-3" />
-                    <span>Zoom/Pan</span>
+    return (
+        <div className="neo-card w-full h-full p-8 flex flex-col relative overflow-hidden">
+            <div className="flex justify-between items-center mb-6">
+                <div className="flex flex-col gap-1">
+                    <h2 className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Dynamic Load Forecast Visualization</h2>
+                    <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Drag to zoom • Scroll to magnify • Drag pan</p>
+                </div>
+
+                <div className="flex items-center gap-3">
+                    <button
+                        onClick={resetZoom}
+                        className="neo-btn py-1.5 px-3 text-[9px] font-black uppercase tracking-widest text-slate-500 hover:text-blue-500 flex items-center gap-2"
+                    >
+                        <RotateCcw size={12} />
+                        Reset View
+                    </button>
+                    {isLoading && (
+                        <div className="flex items-center gap-2">
+                            <div className="w-1.5 h-1.5 bg-blue-500 rounded-full animate-ping"></div>
+                            <span className="text-[9px] font-bold text-blue-500 uppercase">Updating</span>
+                        </div>
+                    )}
                 </div>
             </div>
-        </div>
 
-        {/* Legend Overlay */}
-        <div className="flex justify-center gap-6 mb-2">
-            <div className="flex items-center gap-2">
-                <div className="w-2 h-2 rounded-full bg-blue-400 shadow-[0_0_8px_rgba(96,165,250,0.6)]"></div>
-                <span className="text-[10px] font-bold text-slate-500">Historical</span>
+            <div className="flex-1 min-h-[350px] relative">
+                {!isLoading && forecast.length > 0 && (
+                    <div
+                        className="absolute top-0 right-0 h-[82%] bg-red-400/5 border-l border-dashed border-red-200 pointer-events-none flex items-start justify-center pt-2"
+                        style={{ width: `${(forecast.length / (history.slice(-48).length + forecast.length)) * 100}%` }}
+                    >
+                        <span className="text-[9px] font-black text-red-300 uppercase tracking-[0.2em]">Forecast Region</span>
+                    </div>
+                )}
+
+                {history.length > 0 ? (
+                    <Line ref={chartRef} data={data} options={options} />
+                ) : (
+                    <div className="h-full flex flex-col items-center justify-center opacity-40">
+                        <div className="w-16 h-16 neo-inset rounded-full flex items-center justify-center mb-4">
+                            <Activity size={32} className="text-slate-300" />
+                        </div>
+                        <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Awaiting System Input</p>
+                    </div>
+                )}
             </div>
-            <div className="flex items-center gap-2">
-                <div className="w-2 h-2 rounded-full bg-green-400 shadow-[0_0_8px_rgba(74,222,128,0.6)]"></div>
-                <span className="text-[10px] font-bold text-slate-500">Smoothed</span>
-            </div>
-            <div className="flex items-center gap-2">
-                <div className="w-2 h-2 rounded-full bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.6)]"></div>
-                <span className="text-[10px] font-bold text-slate-500">Predicted (Red)</span>
-            </div>
-             <div className="flex items-center gap-2">
-                <div className="w-2 h-2 rounded-full bg-red-400/50 border border-red-400 border-dashed"></div>
-                <span className="text-[10px] font-bold text-slate-500">Maintenance</span>
-            </div>
         </div>
-
-      <div className="w-full relative pl-2" style={{ height: '280px' }}>
-        <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={data} margin={{ top: 10, right: 10, left: 10, bottom: 20 }}>
-            <defs>
-                <linearGradient id="colorActual" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#60A5FA" stopOpacity={0.1}/>
-                    <stop offset="95%" stopColor="#60A5FA" stopOpacity={0}/>
-                </linearGradient>
-                {/* Predicted gradient - Red */}
-                <linearGradient id="colorPredicted" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#EF4444" stopOpacity={0.2}/>
-                    <stop offset="95%" stopColor="#EF4444" stopOpacity={0}/>
-                </linearGradient>
-            </defs>
-
-            <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" vertical={false} />
-            <XAxis
-                dataKey="timestamp"
-                tick={{fontSize: 10, fill: '#94A3B8'}}
-                axisLine={false}
-                tickLine={false}
-                minTickGap={30}
-                tickFormatter={formatXAxis}
-            >
-                <Label value={getXAxisLabel()} offset={-5} position="insideBottom" style={{fontSize: '10px', fill: '#64748B', fontWeight: 'bold', textTransform: 'uppercase'}} />
-            </XAxis>
-            <YAxis
-                tick={{fontSize: 10, fill: '#94A3B8'}}
-                axisLine={false}
-                tickLine={false}
-                label={{ value: 'Power Demand', angle: -90, position: 'insideLeft', style: {fontSize: '10px', fill: '#64748B', fontWeight: 'bold', textTransform: 'uppercase'} }}
-            />
-            <Tooltip
-                contentStyle={{
-                    backgroundColor: '#F0F2F5',
-                    borderRadius: '12px',
-                    border: 'none',
-                    boxShadow: '-4px -4px 10px #ffffff, 4px 4px 10px #d1d9e6',
-                    fontSize: '12px',
-                    color: '#2D3748'
-                }}
-            />
-
-            {/* Shaded Forecast Zone */}
-            {startForecastIndex > 0 && (
-                <ReferenceArea
-                    x1={data[startForecastIndex]?.timestamp}
-                    x2={data[data.length-1]?.timestamp}
-                    fill="#EF4444"
-                    fillOpacity={0.05}
-                />
-            )}
-
-            {/* Maintenance Windows */}
-            {maintenanceWindows.map((win, idx) => (
-                <ReferenceArea
-                    key={idx}
-                    x1={win.startTimestamp}
-                    x2={win.endTimestamp}
-                    fill="#F87171"
-                    fillOpacity={0.15}
-                    strokeOpacity={0.5}
-                />
-            ))}
-
-            <Area
-                type="monotone"
-                dataKey="actual"
-                stroke="#60A5FA" // Blue
-                strokeWidth={2}
-                fill="url(#colorActual)"
-                connectNulls={false}
-                activeDot={{ r: 5, fill: "#60A5FA", stroke: "#F0F2F5", strokeWidth: 2 }}
-            />
-            <Area
-                type="monotone"
-                dataKey="smoothed"
-                stroke="#4ADE80" // Green
-                strokeWidth={2}
-                fill="transparent"
-                strokeDasharray="0"
-                connectNulls={true}
-            />
-             <Area
-                type="monotone"
-                dataKey="predicted"
-                stroke="#EF4444" // RED - MANDATORY
-                strokeWidth={3}
-                fill="url(#colorPredicted)"
-                connectNulls={true}
-                activeDot={{ r: 6, fill: "#EF4444", stroke: "#F0F2F5", strokeWidth: 2 }}
-                animationDuration={1500}
-            />
-
-            </AreaChart>
-        </ResponsiveContainer>
-
-        {/* Forecast Horizon Label Overlay */}
-        <div className="absolute top-4 right-10 pointer-events-none">
-            <span className="text-[10px] font-bold text-slate-400 tracking-widest uppercase bg-[#F0F2F5]/80 px-2 py-1 rounded">Forecast Horizon</span>
-        </div>
-
-        {/* Zoom Controls Overlay */}
-        <div className="absolute bottom-4 right-4 flex gap-2">
-             <button className="w-8 h-8 rounded-lg neo-card flex items-center justify-center text-slate-500 hover:text-blue-500 active:scale-95 transition-transform">
-                 <ZoomOut className="w-4 h-4" />
-             </button>
-             <button className="w-8 h-8 rounded-lg neo-card flex items-center justify-center text-slate-500 hover:text-blue-500 active:scale-95 transition-transform">
-                 <ZoomIn className="w-4 h-4" />
-             </button>
-        </div>
-      </div>
-    </div>
-  );
+    );
 }

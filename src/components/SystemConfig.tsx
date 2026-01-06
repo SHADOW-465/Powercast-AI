@@ -1,250 +1,297 @@
 "use client";
 
 import { useState } from "react";
-import { Upload, Trash2, Zap, Settings, Activity, Plus, Edit2, X } from "lucide-react";
+import { Trash2, Plus, Zap, ChevronUp, ChevronDown } from "lucide-react";
 import FileUpload from "./FileUpload";
 
 interface GeneratorUnit {
-  id: string;
-  name: string;
-  capacityMW: number;
-  type: string;
+    id: string;
+    name: string;
+    capacityMW: number;
+    type: 'solar' | 'wind' | 'hydro' | 'thermal' | 'nuclear' | 'other';
+    isRenewable: boolean;
+    status: 'ON' | 'OFF';
+    marginalCost: number;
+    emissionFactor: number;
+}
+
+interface MaintenanceWindow {
+    id: string;
+    start: string;
+    end: string;
+    reason: string;
 }
 
 interface SystemConfigProps {
-  onDataLoaded: (data: any[]) => void;
-  dataCount: number;
-  horizon: number;
-  setHorizon: (val: number) => void;
-  horizonUnit: 'hours' | 'days' | 'years';
-  setHorizonUnit: (val: 'hours' | 'days' | 'years') => void;
-  lookback: number;
-  setLookback: (val: number) => void;
-  units: GeneratorUnit[];
-  setUnits: (units: GeneratorUnit[]) => void;
-  onRunForecast: () => void;
-  isLoading: boolean;
+    onDataLoaded: (data: any[]) => void;
+    dataCount: number;
+    horizon: number;
+    setHorizon: (val: number) => void;
+    horizonUnit: 'hours' | 'days' | 'years';
+    setHorizonUnit: (val: 'hours' | 'days' | 'years') => void;
+    lookback: number;
+    setLookback: (val: number) => void;
+    units: GeneratorUnit[];
+    setUnits: (units: GeneratorUnit[]) => void;
+    maintenanceWindows: MaintenanceWindow[];
+    setMaintenanceWindows: (windows: MaintenanceWindow[]) => void;
+    location: string;
+    setLocation: (val: string) => void;
+    onRunForecast: () => void;
+    isLoading: boolean;
 }
 
 export default function SystemConfig({
-  onDataLoaded,
-  dataCount,
-  horizon,
-  setHorizon,
-  horizonUnit,
-  setHorizonUnit,
-  lookback,
-  setLookback,
-  units,
-  setUnits,
-  onRunForecast,
-  isLoading
+    onDataLoaded,
+    dataCount,
+    horizon,
+    setHorizon,
+    horizonUnit,
+    setHorizonUnit,
+    units,
+    setUnits,
+    maintenanceWindows,
+    setMaintenanceWindows,
+    location,
+    setLocation,
+    onRunForecast,
+    isLoading
 }: SystemConfigProps) {
-  const [activeTab, setActiveTab] = useState<'upload' | 'params' | 'fleet'>('upload');
+    const [isConfigOpen, setIsConfigOpen] = useState(true);
 
-  // Unit Editing State
-  const [isEditingUnit, setIsEditingUnit] = useState(false);
-  const [editingUnitId, setEditingUnitId] = useState<string | null>(null);
-  const [unitForm, setUnitForm] = useState({ name: '', capacityMW: '', type: 'Thermal' });
+    const addUnit = () => {
+        const newUnit: GeneratorUnit = {
+            id: Math.random().toString(36).substr(2, 9),
+            name: `Unit ${units.length + 1}`,
+            capacityMW: 500,
+            type: 'thermal',
+            isRenewable: false,
+            status: 'ON',
+            marginalCost: 45,
+            emissionFactor: 400
+        };
+        setUnits([...units, newUnit]);
+    };
 
-  const startAddUnit = () => {
-      setUnitForm({ name: '', capacityMW: '', type: 'Thermal' });
-      setEditingUnitId(null);
-      setIsEditingUnit(true);
-  };
+    const updateUnit = (id: string, field: keyof GeneratorUnit, value: any) => {
+        setUnits(units.map(u => u.id === id ? { ...u, [field]: value } : u));
+    };
 
-  const startEditUnit = (unit: GeneratorUnit) => {
-      setUnitForm({ name: unit.name, capacityMW: unit.capacityMW.toString(), type: unit.type });
-      setEditingUnitId(unit.id);
-      setIsEditingUnit(true);
-  };
+    const removeUnit = (id: string) => {
+        setUnits(units.filter(u => u.id !== id));
+    };
 
-  const saveUnit = () => {
-      if (!unitForm.name || !unitForm.capacityMW) {
-          alert("Please fill in all fields.");
-          return;
-      }
+    const addMaintenance = () => {
+        const newWindow: MaintenanceWindow = {
+            id: Math.random().toString(36).substr(2, 9),
+            start: '09:00 AM',
+            end: '05:00 PM',
+            reason: 'Low Demand'
+        };
+        setMaintenanceWindows([...maintenanceWindows, newWindow]);
+    };
 
-      const newUnit = {
-          id: editingUnitId || Math.random().toString(36).substr(2, 9),
-          name: unitForm.name,
-          capacityMW: Number(unitForm.capacityMW),
-          type: unitForm.type
-      };
+    const removeMaintenance = (id: string) => {
+        setMaintenanceWindows(maintenanceWindows.filter(m => m.id !== id));
+    };
 
-      if (editingUnitId) {
-          setUnits(units.map(u => u.id === editingUnitId ? newUnit : u));
-      } else {
-          setUnits([...units, newUnit]);
-      }
-      setIsEditingUnit(false);
-  };
+    const updateMaintenance = (id: string, field: keyof MaintenanceWindow, value: string) => {
+        setMaintenanceWindows(maintenanceWindows.map(m => m.id === id ? { ...m, [field]: value } : m));
+    };
 
-  const removeUnit = (id: string) => {
-      setUnits(units.filter(u => u.id !== id));
-  };
+    return (
+        <div className="flex flex-col gap-6">
 
-  return (
-    <div className="flex flex-col gap-6 h-full">
-
-      {/* Top Card: Tabs + Content */}
-      <div className="neo-card p-6 flex flex-col gap-6">
-
-        {/* Tabs */}
-        <div className="flex p-1 neo-inset rounded-xl">
-            {[
-                { id: 'upload', label: 'DATA' },
-                { id: 'params', label: 'PARAMS' },
-                { id: 'fleet', label: 'FLEET' }
-            ].map(tab => (
-                <button
-                    key={tab.id}
-                    onClick={() => setActiveTab(tab.id as any)}
-                    className={`flex-1 py-2 text-[10px] font-bold tracking-wider rounded-lg transition-all ${
-                        activeTab === tab.id
-                        ? 'bg-[#F0F2F5] text-blue-600 shadow-[-3px_-3px_6px_#ffffff,3px_3px_6px_#d1d9e6]'
-                        : 'text-slate-500 hover:text-slate-700'
-                    }`}
-                >
-                    {tab.label}
-                </button>
-            ))}
-        </div>
-
-        {/* Tab Content */}
-        <div className="min-h-[150px]">
-            {activeTab === 'upload' && (
-                <div className="h-full flex flex-col items-center justify-center border-2 border-dashed border-slate-300 rounded-xl p-4 hover:border-blue-400 transition-colors cursor-pointer group">
-                   <FileUpload onDataLoaded={onDataLoaded} />
-                   {dataCount > 0 && (
-                       <p className="mt-2 text-xs text-green-600 font-bold">✓ {dataCount} points loaded</p>
-                   )}
-                </div>
-            )}
-
-            {activeTab === 'params' && (
-                <div className="space-y-4 py-2">
-                     <p className="text-xs text-slate-500 mb-2">Prediction Window Control</p>
-
-                     {/* Horizon Input */}
-                     <div className="flex items-center gap-3">
-                        <div className="flex-1">
-                            <label className="text-[10px] font-bold text-slate-400 uppercase">Length</label>
-                            <input
-                                type="number"
-                                value={horizon}
-                                onChange={(e) => setHorizon(Number(e.target.value))}
-                                className="w-full neo-inset rounded-lg p-2 text-xs font-bold text-slate-700 outline-none focus:ring-1 focus:ring-blue-400"
-                            />
-                        </div>
-                         <div className="flex-1">
-                            <label className="text-[10px] font-bold text-slate-400 uppercase">Unit</label>
-                            <select
-                                value={horizonUnit}
-                                onChange={(e) => setHorizonUnit(e.target.value as 'hours' | 'days' | 'years')}
-                                className="w-full neo-inset rounded-lg p-2 text-xs font-bold text-slate-700 outline-none bg-transparent"
-                            >
-                                <option value="hours">Hours</option>
-                                <option value="days">Days</option>
-                                <option value="years">Years</option>
-                            </select>
-                        </div>
-                     </div>
-
-                     <div className="mt-4">
-                        <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">Context Look-back ({lookback} pts)</label>
-                         <input
-                            type="range"
-                            min="24" max="168" step="12"
-                            value={lookback}
-                            onChange={(e) => setLookback(Number(e.target.value))}
-                            className="w-full h-2 rounded-lg appearance-none cursor-pointer bg-slate-200"
-                         />
-                     </div>
-                </div>
-            )}
-
-            {activeTab === 'fleet' && !isEditingUnit && (
-                 <div className="h-full flex flex-col">
-                    <div className="flex justify-between items-center mb-2">
-                        <p className="text-xs text-slate-500">Configure Assets ({units.length})</p>
-                        <button onClick={startAddUnit} className="text-[10px] font-bold text-blue-500 hover:underline flex items-center gap-1">
-                             <Plus className="w-3 h-3" /> Add
-                        </button>
-                    </div>
-                    <div className="flex-1 overflow-y-auto pr-1 space-y-2 max-h-[140px]">
-                        {units.map((unit) => (
-                          <div key={unit.id} className="neo-card p-2 flex items-center justify-between group">
-                              <div className="flex items-center gap-2 overflow-hidden">
-                                  <div className="w-6 h-6 rounded-full neo-inset flex items-center justify-center text-slate-400 shrink-0">
-                                     <Zap className="w-3 h-3" />
-                                  </div>
-                                  <div className="min-w-0">
-                                      <div className="text-[10px] font-bold text-slate-700 truncate">{unit.name}</div>
-                                      <div className="text-[9px] text-slate-500 truncate">{unit.capacityMW} MW • {unit.type}</div>
-                                  </div>
-                              </div>
-                              <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                  <button onClick={() => startEditUnit(unit)} className="w-5 h-5 flex items-center justify-center text-slate-400 hover:text-blue-500">
-                                      <Edit2 className="w-3 h-3" />
-                                  </button>
-                                  <button onClick={() => removeUnit(unit.id)} className="w-5 h-5 flex items-center justify-center text-slate-400 hover:text-red-500">
-                                      <Trash2 className="w-3 h-3" />
-                                  </button>
-                              </div>
-                          </div>
-                        ))}
-                    </div>
-                 </div>
-            )}
-
-            {activeTab === 'fleet' && isEditingUnit && (
-                <div className="flex flex-col gap-2 h-full">
-                    <div className="flex justify-between items-center mb-1">
-                        <span className="text-xs font-bold text-slate-600">{editingUnitId ? 'Edit Unit' : 'Add Unit'}</span>
-                        <button onClick={() => setIsEditingUnit(false)}><X className="w-4 h-4 text-slate-400" /></button>
-                    </div>
-                    <input
-                        placeholder="Name (e.g., Gas Unit A)"
-                        value={unitForm.name}
-                        onChange={e => setUnitForm({...unitForm, name: e.target.value})}
-                        className="neo-inset p-2 rounded text-xs w-full"
-                    />
-                     <input
-                        placeholder="Capacity (MW)"
-                        type="number"
-                        value={unitForm.capacityMW}
-                        onChange={e => setUnitForm({...unitForm, capacityMW: e.target.value})}
-                        className="neo-inset p-2 rounded text-xs w-full"
-                    />
-                    <select
-                        value={unitForm.type}
-                        onChange={e => setUnitForm({...unitForm, type: e.target.value})}
-                        className="neo-inset p-2 rounded text-xs w-full bg-transparent"
-                    >
-                        <option value="Thermal">Thermal</option>
-                        <option value="Hydro">Hydro</option>
-                        <option value="Renewable">Renewable</option>
-                        <option value="Nuclear">Nuclear</option>
-                    </select>
-                    <button onClick={saveUnit} className="neo-btn mt-auto py-1 text-xs text-blue-500 font-bold">
-                        Save Unit
+            {/* 1. Forecast Parameters */}
+            <div className="neo-card flex flex-col gap-4">
+                <div className="flex items-center justify-between">
+                    <h3 className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Global Parameters</h3>
+                    <button onClick={() => setIsConfigOpen(!isConfigOpen)} className="text-slate-400">
+                        {isConfigOpen ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
                     </button>
                 </div>
+
+                {isConfigOpen && (
+                    <div className="flex flex-col gap-4">
+                        <div className="flex flex-col gap-1.5">
+                            <label className="text-[10px] font-bold text-slate-400 uppercase">Grid Location (City or Lat/Lng)</label>
+                            <input
+                                type="text"
+                                placeholder="e.g. New York, NY"
+                                value={location}
+                                onChange={(e) => setLocation(e.target.value)}
+                                className="neo-input w-full font-bold text-slate-700"
+                            />
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="flex flex-col gap-1.5">
+                                <label className="text-[10px] font-bold text-slate-400 uppercase">Prediction Window</label>
+                                <input
+                                    type="number"
+                                    value={horizon}
+                                    onChange={(e) => setHorizon(Number(e.target.value))}
+                                    className="neo-input w-full font-bold text-slate-700"
+                                />
+                            </div>
+
+                            <div className="flex flex-col gap-1.5">
+                                <label className="text-[10px] font-bold text-slate-400 uppercase">Time Unit</label>
+                                <div className="flex p-1 neo-inset rounded-xl">
+                                    {(['hours', 'days', 'years'] as const).map((unit) => (
+                                        <button
+                                            key={unit}
+                                            onClick={() => setHorizonUnit(unit)}
+                                            className={`neo-pill flex-1 ${horizonUnit === unit ? 'neo-pill-active' : 'neo-pill-inactive'}`}
+                                        >
+                                            {unit}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                )}
+            </div>
+
+            {/* 2. Generator Fleet Configuration */}
+            <div className="neo-card flex flex-col gap-4">
+                <div className="flex items-center justify-between">
+                    <h3 className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Hybrid Dispatch Fleet</h3>
+                    <button onClick={addUnit} className="neo-btn flex items-center justify-center bg-blue-500 text-white rounded-full p-1.5 shadow-none w-full max-w-[80px] text-[9px] py-1">
+                        ADD UNIT
+                    </button>
+                </div>
+
+                <div className="flex flex-col gap-3">
+                    <div className="grid grid-cols-[1fr_0.8fr_0.4fr_0.4fr_0.4fr_0.2fr] gap-2 px-1">
+                        <span className="text-[8px] font-bold text-slate-400 uppercase">Unit & Type</span>
+                        <span className="text-[8px] font-bold text-slate-400 uppercase text-center">Is Green</span>
+                        <span className="text-[8px] font-bold text-slate-400 uppercase text-center">MW</span>
+                        <span className="text-[8px] font-bold text-slate-400 uppercase text-center">Cost</span>
+                        <span className="text-[8px] font-bold text-slate-400 uppercase text-center">CO2</span>
+                        <span></span>
+                    </div>
+                    <div className="flex flex-col gap-3 max-h-[300px] overflow-y-auto pr-1">
+                        {units.map((unit) => (
+                            <div key={unit.id} className="grid grid-cols-[1fr_0.8fr_0.4fr_0.4fr_0.4fr_0.2fr] gap-2 items-center">
+                                <div className="flex flex-col gap-1">
+                                    <input
+                                        value={unit.name}
+                                        onChange={(e) => updateUnit(unit.id, 'name', e.target.value)}
+                                        className="neo-input py-1 text-[9px] font-black uppercase"
+                                    />
+                                    <select
+                                        value={unit.type}
+                                        onChange={(e) => updateUnit(unit.id, 'type', e.target.value)}
+                                        className="text-[8px] font-bold text-slate-400 bg-transparent border-none outline-none cursor-pointer"
+                                    >
+                                        <option value="thermal">Thermal</option>
+                                        <option value="solar">Solar</option>
+                                        <option value="wind">Wind</option>
+                                        <option value="hydro">Hydro</option>
+                                        <option value="nuclear">Nuclear</option>
+                                    </select>
+                                </div>
+                                <div className="flex justify-center">
+                                    <button
+                                        onClick={() => updateUnit(unit.id, 'isRenewable', !unit.isRenewable)}
+                                        className={`w-8 h-4 rounded-full relative transition-all ${unit.isRenewable ? 'bg-green-400' : 'bg-slate-200'}`}
+                                    >
+                                        <div className={`absolute top-0.5 w-3 h-3 bg-white rounded-full transition-all ${unit.isRenewable ? 'left-[18px]' : 'left-[2px]'}`}></div>
+                                    </button>
+                                </div>
+                                <input
+                                    type="number"
+                                    value={unit.capacityMW}
+                                    onChange={(e) => updateUnit(unit.id, 'capacityMW', Number(e.target.value))}
+                                    className="neo-input py-1 text-[9px] font-bold text-center"
+                                />
+                                <input
+                                    type="number"
+                                    value={unit.marginalCost}
+                                    onChange={(e) => updateUnit(unit.id, 'marginalCost', Number(e.target.value))}
+                                    className="neo-input py-1 text-[9px] font-bold text-center"
+                                />
+                                <input
+                                    type="number"
+                                    value={unit.emissionFactor}
+                                    onChange={(e) => updateUnit(unit.id, 'emissionFactor', Number(e.target.value))}
+                                    className="neo-input py-1 text-[9px] font-bold text-center"
+                                />
+                                <div className="flex items-center justify-end">
+                                    <button onClick={() => removeUnit(unit.id)} className="text-slate-300 hover:text-red-500">
+                                        <Trash2 size={12} />
+                                    </button>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            </div>
+
+            {/* 3. Maintenance Scheduling */}
+            <div className="neo-card flex flex-col gap-4">
+                <div className="flex items-center justify-between">
+                    <h3 className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Maintenance Scheduling</h3>
+                    <button onClick={addMaintenance} className="neo-btn flex items-center justify-center bg-blue-100 text-blue-600 rounded-lg p-1 px-3 shadow-none border border-blue-200 text-[9px] uppercase font-black">
+                        Add Window
+                    </button>
+                </div>
+
+                <div className="flex flex-col gap-3">
+                    <div className="grid grid-cols-[0.8fr_0.8fr_1fr_0.2fr] gap-2 px-1">
+                        <span className="text-[9px] font-bold text-slate-400 uppercase">Start</span>
+                        <span className="text-[9px] font-bold text-slate-400 uppercase">End</span>
+                        <span className="text-[9px] font-bold text-slate-400 uppercase">Reason</span>
+                        <span></span>
+                    </div>
+                    <div className="flex flex-col gap-2 max-h-[150px] overflow-y-auto pr-1">
+                        {maintenanceWindows.map((win) => (
+                            <div key={win.id} className="grid grid-cols-[0.8fr_0.8fr_1fr_0.2fr] gap-2 items-center">
+                                <input
+                                    type="text"
+                                    value={win.start}
+                                    onChange={(e) => updateMaintenance(win.id, 'start', e.target.value)}
+                                    className="neo-input py-1 text-[10px] font-medium"
+                                />
+                                <input
+                                    type="text"
+                                    value={win.end}
+                                    onChange={(e) => updateMaintenance(win.id, 'end', e.target.value)}
+                                    className="neo-input py-1 text-[10px] font-medium"
+                                />
+                                <select
+                                    value={win.reason}
+                                    onChange={(e) => updateMaintenance(win.id, 'reason', e.target.value)}
+                                    className="neo-input py-1 text-[10px] font-medium bg-transparent"
+                                >
+                                    <option value="Low Demand">Low Demand</option>
+                                    <option value="Refueling">Refueling</option>
+                                    <option value="Overhaul">Overhaul</option>
+                                </select>
+                                <button onClick={() => removeMaintenance(win.id)} className="text-slate-300 hover:text-red-500">
+                                    <Trash2 size={11} />
+                                </button>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            </div>
+
+            <FileUpload onDataLoaded={onDataLoaded} />
+            {dataCount > 0 && (
+                <p className="text-[10px] text-green-600 font-bold text-center -mt-2 uppercase tracking-widest">✓ {dataCount} Data Points Available</p>
             )}
+
+            <button
+                onClick={onRunForecast}
+                disabled={isLoading || dataCount === 0}
+                className={`neo-btn-primary w-full py-4 uppercase tracking-[0.2em] text-xs font-black ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
+            >
+                {isLoading ? 'Processing AI Models...' : 'Initiate AI Forecast'}
+            </button>
+
         </div>
-      </div>
-
-      <div className="mt-auto">
-          <button
-            onClick={onRunForecast}
-            disabled={isLoading}
-            className={`neo-btn w-full text-xs uppercase tracking-wider py-4 ${isLoading ? 'opacity-70 cursor-wait' : 'hover:text-blue-600'}`}
-          >
-              {isLoading ? 'Processing...' : 'Initiate AI Forecast'}
-          </button>
-      </div>
-
-    </div>
-  );
+    );
 }

@@ -1,73 +1,84 @@
-# PowerCast AI: Electrical Load Forecasting & Decision Support
+# ⚡ PowerCast AI: Advanced Electrical Load Forecasting & Hybrid Dispatch
 
-A professional, AI-driven dashboard for electrical load forecasting and power system decision support.
-This application leverages **Google Gemini** for time-series forecasting and intelligent reasoning, avoiding traditional local ML model training.
+PowerCast AI is a neomorphic, high-performance dashboard designed for modern electrical grid management. It leverages **Gemini 2.0 Flash** and advanced signal processing to provide accurate load forecasting and environmentally optimized generator dispatch.
 
-## 🚀 Features
+---
 
-- **No-Code AI Forecasting**: Uses Gemini API to predict future load based on historical patterns.
-- **Smart Preprocessing**: Applies **Savitzky-Golay smoothing** (Window=11, Poly=2) to noise-reduce data before analysis.
-- **Decision Support**:
-  - **Unit Commitment**: Suggests generator ON/OFF status based on predicted load and unit capacities.
-  - **Maintenance Planning**: Identifies low-load windows suitable for maintenance.
-- **Interactive Visualization**: Dynamic charts comparing historical, smoothed, and predicted data.
-- **Neomorphic UI**: Modern, clean, control-room style dashboard.
+## 🚀 Key Features
+
+### 🧠 Intelligent Forecasting
+- **Adaptive Signal Quality Controller**: Implementation of dynamic Savitzky-Golay filtering that analyzes Signal-to-Noise Ratio (SNR) and Volatility to tune smoothing parameters in real-time.
+- **Seasonality Detection**: Uses Autocorrelation to detect 24h/48h/168h cycles and optimizes Gemini's context window accordingly.
+- **Exogenous Integration**: Location-aware forecasting that fetches real-time weather (Temperature, Cloud Cover, Wind) to correlate atmospheric factors with grid demand.
+
+### 🍃 Hybrid Generation Dispatch
+- **Environmental Priority Dispatch**: Greedy optimization that saturates load with Renewable units (Solar, Wind, Hydro) first to minimize emissions.
+- **Real-time Sustainability Scoring**: Hourly calculation of `environmentalImpact` (CO2 eq) and renewable energy mix percentage.
+- **Smart Maintenance Planning**: AI-driven suggestions for maintenance windows during low-load periods, validated by internal MAPE backtests.
+
+### 🎨 Premium Visualization
+- **Interactive Neomorphic UI**: A sleek, high-contrast dashboard with pill-box controls and glassmorphism effects.
+- **Context-Aware Charts**: Interactive ResultsChart with drag-to-zoom, scroll-to-zoom, and adaptive X-axis scaling for Hours vs. Years views.
+
+---
 
 ## 🛠️ Tech Stack
 
-- **Frontend**: Next.js 16 (App Router), React 19, Tailwind CSS 4, Recharts.
-- **Backend**: Next.js API Routes (Node.js).
-- **AI Engine**: Google Gemini API (`gemini-2.0-flash`).
-- **Data Processing**: Custom TypeScript implementations for signal processing.
+- **Framework**: [Next.js 15+](https://nextjs.org/) (App Router)
+- **AI Platform**: [Google Gemini 2.0 Flash](https://aistudio.google.com/)
+- **Styling**: Tailwind CSS 4 (Custom Neomorphic Design System)
+- **Charts**: Chart.js with Interactive Zoom/Pan plugins
+- **Logic**: Custom Signal Processing & Autocorrelation Utilities
 
-## 📦 Installation & Setup
+---
 
-1.  **Clone the repository**
-2.  **Install dependencies**:
+## ⚙️ Environment Variables
+
+To run this project, you must configure the Gemini API Key.
+
+1.  **Get an API Key**: Visit [Google AI Studio](https://aistudio.google.com/) and create a free API Key for Gemini 2.0 Flash.
+2.  **Setup `.env.local`**: Create a file named `.env.local` in the root directory:
+    ```bash
+    GEMINI_API_KEY=your_gemini_api_key_here
+    ```
+
+> [!IMPORTANT]
+> The application will fail to generate forecasts if the `GEMINI_API_KEY` is missing or invalid.
+
+---
+
+## 📦 Installation
+
+1.  **Clone the Repo**:
+    ```bash
+    git clone https://github.com/SHADOW-465/Powercast-AI.git
+    cd Powercast-AI
+    ```
+2.  **Install Dependencies**:
     ```bash
     npm install
     ```
-3.  **Configure Environment**:
-    Create a `.env.local` file in the root directory and add your Google Gemini API Key:
-    ```bash
-    GEMINI_API_KEY=your_api_key_here
-    ```
-4.  **Run the Application**:
+3.  **Start Development Server**:
     ```bash
     npm run dev
     ```
-    Open [http://localhost:3000](http://localhost:3000) in your browser.
 
-## 📖 Usage Guide
+---
 
-1.  **Upload Data**: Use the "Historical Data" upload box to select a CSV file.
-    - Format: `timestamp,load`
-    - Example:
-      ```csv
-      timestamp,load
-      2024-01-01 00:00,120.5
-      2024-01-01 01:00,118.2
-      ```
-2.  **Configure System**:
-    - Set the **Forecast Horizon** (e.g., 24 hours).
-    - Adjust **Generator Capacities** if needed.
-3.  **Run Analysis**: Click the "Run Analysis" button.
-4.  **View Results**:
-    - **Graph**: See the trend continuation.
-    - **Status Board**: Check which units should be running.
-    - **Maintenance**: See recommended maintenance times.
+## 📂 Architecture Overview
 
-## 🧠 AI Strategy (Prompt Engineering)
+- **`src/utils/signalProcessing.ts`**: Adaptive Signal Quality Controller & SG Optimization.
+- **`src/utils/weatherService.ts`**: Exogenous data fetcher (Weather/Environmental).
+- **`src/utils/decisionLogic.ts`**: Environmental Priority Dispatch & Unit Commitment.
+- **`src/utils/gemini.ts`**: Multi-variable Prompt Engineering & AI Orchestration.
+- **`app/api/forecast/route.ts`**: Unified forecasting pipeline.
 
-Instead of training a model (like LSTM), we use **In-Context Learning**:
-1.  **Context**: We feed the last 48 hours of *smoothed* historical data to Gemini.
-2.  **Prompt**: We instruct Gemini to act as a power systems expert, analyze seasonality/trends, and output a JSON array of future values.
-3.  **Reasoning**: The system implicitly uses the LLM's vast knowledge of time-series patterns to extrapolate the load curve.
+---
 
-## 📂 Project Structure
+## 📝 Recent Upgrades (Build v2.1)
 
-- `src/utils/signalProcessing.ts`: Savitzky-Golay implementation.
-- `src/utils/gemini.ts`: Interface with Google Generative AI.
-- `src/utils/decisionLogic.ts`: Logic for unit commitment and maintenance.
-- `app/api/forecast/route.ts`: Main API handler.
-- `src/components/`: Reusable UI components (Neomorphic style).
+- ✅ **Integrated Interactive Zoom/Pan** on ResultsChart.
+- ✅ **Implemented Adaptive Lookback** logic based on data autocorrelation.
+- ✅ **Added Location-Awareness** allowing grid behavior simulation based on city weather.
+- ✅ **Refactored Dispatch Logic** for Hybrid Green/Brown energy mixes.
+- ✅ **Optimized Signal Quality Control** with MAPE-based error feedback loop.

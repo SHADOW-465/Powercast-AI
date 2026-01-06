@@ -1,50 +1,71 @@
 "use client";
 
-import { useState } from 'react';
-import SystemConfig from '@/components/SystemConfig';
-import ResultsChart from '@/components/ResultsChart';
-import StatusBoard from '@/components/StatusBoard';
-import AIInsights from '@/components/AIInsights';
-import FuturePlanning from '@/components/FuturePlanning';
-import { BarChart3, Zap, Sparkles } from 'lucide-react';
+import { useState } from "react";
+import { Zap, Activity, Info } from "lucide-react";
+import dynamic from 'next/dynamic';
+import SystemConfig from "@/components/SystemConfig";
+const ResultsChart = dynamic(() => import("@/components/ResultsChart"), { ssr: false });
+import StatusBoard from "@/components/StatusBoard";
+import AIInsights from "@/components/AIInsights";
+import MaintenanceTimeline from "@/components/MaintenanceTimeline";
+import FuturePlanning from "@/components/FuturePlanning";
+
+// Unified interfaces
+export interface GeneratorUnit {
+  id: string;
+  name: string;
+  capacityMW: number;
+  type: 'solar' | 'wind' | 'hydro' | 'thermal' | 'nuclear' | 'other';
+  isRenewable: boolean;
+  status: 'ON' | 'OFF';
+  marginalCost: number;
+  emissionFactor: number;
+}
+
+export interface MaintenanceWindowConfig {
+  id: string;
+  start: string;
+  end: string;
+  reason: string;
+}
 
 export default function Home() {
   const [historicalData, setHistoricalData] = useState<any[]>([]);
   const [horizon, setHorizon] = useState(24);
   const [horizonUnit, setHorizonUnit] = useState<'hours' | 'days' | 'years'>('hours');
-  const [lookback, setLookback] = useState(48);
+  const [lookback, setLookback] = useState(168);
   const [loading, setLoading] = useState(false);
   const [results, setResults] = useState<any>(null);
-
-  // Default units (with stable IDs)
-  const [units, setUnits] = useState([
-    { id: 'u1', name: 'Thermal Unit A', capacityMW: 2500, type: 'Thermal' },
-    { id: 'u2', name: 'Hydro Unit B', capacityMW: 3500, type: 'Hydro' },
-    { id: 'u3', name: 'Gas Unit C', capacityMW: 3000, type: 'Thermal' },
+  const [location, setLocation] = useState("New York, NY");
+  const [units, setUnits] = useState<GeneratorUnit[]>([
+    { id: '1', name: 'Thermal Base-1', capacityMW: 1200, type: 'thermal', isRenewable: false, status: 'ON', marginalCost: 40, emissionFactor: 450 },
+    { id: '2', name: 'Solar Farm Alpha', capacityMW: 450, type: 'solar', isRenewable: true, status: 'ON', marginalCost: 5, emissionFactor: 0 },
+    { id: '3', name: 'Wind Ridge', capacityMW: 300, type: 'wind', isRenewable: true, status: 'ON', marginalCost: 8, emissionFactor: 0 },
   ]);
 
+  const [maintenanceWindows, setMaintenanceWindows] = useState<MaintenanceWindowConfig[]>([]);
+
   const handleRunForecast = async () => {
-    if (historicalData.length === 0) {
-      alert("Please upload historical load data.");
-      return;
-    }
+    if (historicalData.length === 0) return;
 
     setLoading(true);
-    setResults(null); // Clear previous results to trigger loading state
+    setResults(null);
 
     try {
-      const res = await fetch('/api/forecast', {
+      const resp = await fetch('/api/forecast', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           historicalData,
           horizon,
           horizonUnit,
-          units
+          units,
+          location,
+          maintenanceWindows
         })
       });
 
-      const data = await res.json();
+      const data = await resp.json();
       if (data.error) {
         alert(data.error);
       } else {
@@ -58,30 +79,44 @@ export default function Home() {
   };
 
   return (
-    <main className="min-h-screen p-6 md:p-8 flex flex-col gap-6 overflow-auto bg-[#F0F2F5]">
-      {/* Header */}
-      <header className="flex items-center justify-between mb-2">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl neo-card flex items-center justify-center">
-            <Zap className="w-5 h-5 text-blue-500" />
+    <main className="min-h-screen p-8 flex flex-col gap-8">
+
+      {/* Header Section */}
+      <header className="flex justify-between items-center px-2">
+        <div className="flex items-center gap-6">
+          <div className="w-12 h-12 neo-card flex items-center justify-center text-blue-500 rounded-2xl shadow-lg border border-white/50">
+            <Zap size={24} fill="#3B82F6" />
           </div>
           <div>
-            <h1 className="text-xl font-bold text-slate-700">PowerCast AI</h1>
+            <h1 className="text-2xl font-black text-slate-700 tracking-tight uppercase">Powercast-AI Dashboard</h1>
+            <div className="flex items-center gap-2 mt-1">
+              <div className="neo-status-dot bg-green-500"></div>
+              <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">System Operational</span>
+            </div>
           </div>
         </div>
-        <div className="flex items-center gap-2 px-4 py-2 neo-card rounded-full">
-          <div className={`w-2 h-2 rounded-full ${loading ? 'bg-yellow-400 animate-pulse' : results ? 'bg-green-400' : 'bg-blue-400'}`}></div>
-          <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
-            {loading ? 'Processing' : results ? 'Forecast Ready' : 'System Ready'}
-          </span>
+
+        <div className="flex items-center gap-8">
+          <div className="flex flex-col items-end">
+            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">AI Status</span>
+            <span className="text-xs font-bold text-slate-600 uppercase tracking-wider">{loading ? 'Processing...' : 'Ready'}</span>
+          </div>
+          <div className="neo-btn group relative p-3 rounded-full hover:text-blue-500">
+            <Info size={18} />
+            <div className="absolute top-full right-0 mt-4 neo-card p-4 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50 w-[240px]">
+              <p className="text-[10px] font-bold text-slate-500 leading-relaxed uppercase tracking-widest leading-loose">
+                Next-gen electrical load forecasting using Google Gemini Intelligence.
+              </p>
+            </div>
+          </div>
         </div>
       </header>
 
-      {/* Main Layout */}
-      <div className="flex flex-col md:flex-row gap-8 flex-1">
-        {/* Sidebar */}
-        <div className="w-full md:w-1/4 min-w-[340px] flex flex-col gap-6">
-          <h2 className="text-xs font-bold tracking-wider text-slate-500 uppercase mb-2 ml-1">Input & Configuration</h2>
+      {/* Main Grid Layout */}
+      <div className="flex-1 grid grid-cols-[1fr_2.8fr] gap-8">
+
+        {/* Sidebar Configuration */}
+        <aside className="flex flex-col gap-6">
           <SystemConfig
             onDataLoaded={setHistoricalData}
             dataCount={historicalData.length}
@@ -93,80 +128,66 @@ export default function Home() {
             setLookback={setLookback}
             units={units}
             setUnits={setUnits}
+            maintenanceWindows={maintenanceWindows}
+            setMaintenanceWindows={setMaintenanceWindows}
+            location={location}
+            setLocation={setLocation}
             onRunForecast={handleRunForecast}
             isLoading={loading}
           />
-        </div>
+        </aside>
 
-        {/* Main Content */}
-        <div className="w-full md:w-3/4 flex flex-col gap-6 h-full overflow-y-auto pr-2 pb-10">
-          <h1 className="text-xs font-bold tracking-wider text-slate-500 uppercase mb-2 ml-1">Forecasting & Decision Support</h1>
+        {/* Visualization & Analysis Area */}
+        <section className="flex flex-col gap-8">
 
-          {/* Chart Panel */}
-          <div className="min-h-[420px]">
-            {results ? (
-              <ResultsChart
-                history={results.processedHistory}
-                forecast={results.forecast}
-                horizon={horizon}
-                horizonUnit={horizonUnit}
-                maintenanceWindows={results.maintenance}
+          {/* Top Chart Area */}
+          <div className="flex-1 min-h-[450px]">
+            <ResultsChart
+              history={historicalData}
+              forecast={results?.forecast || []}
+              horizon={horizon}
+              horizonUnit={horizonUnit}
+              isLoading={loading}
+            />
+          </div>
+
+          {/* Bottom Analysis Grid (3-Columns) */}
+          <div className="grid grid-cols-3 gap-8 h-[380px]">
+
+            {/* Column 1: Generator Commitment */}
+            <div className="neo-card p-6 flex flex-col overflow-hidden">
+              <h3 className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-6">Generator Commitment</h3>
+              <StatusBoard
+                units={units}
+                commitment={results?.unitCommitment}
               />
-            ) : (
-              <div className="neo-card w-full h-full p-6 flex flex-col">
-                <h2 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-4">Dynamic Load Forecast Visualization</h2>
-                <div className="flex-1 flex flex-col items-center justify-center opacity-40">
-                  <BarChart3 className="w-12 h-12 mb-3 text-slate-400" />
-                  <p className="text-sm font-medium text-slate-500">
-                    {loading ? 'Processing Forecast...' : 'Awaiting Forecast Execution'}
-                  </p>
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Middle Panels: Unit Commitment & Future Planning */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 min-h-[380px]">
-
-            {/* Unit Commitment */}
-            <div className="h-full">
-              {results ? (
-                <StatusBoard unitCommitment={results.unitCommitment} maintenance={results.maintenance} units={units} />
-              ) : (
-                <div className="neo-card w-full h-full p-6 flex flex-col">
-                  <h2 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-6">Optimized Unit Commitment & Maintenance</h2>
-                  <div className="flex-1 flex flex-col items-center justify-center opacity-40">
-                    <Zap className="w-10 h-10 mb-3 text-slate-400" />
-                    <p className="text-sm font-medium text-slate-500">Unit Status Pending</p>
-                  </div>
-                </div>
-              )}
             </div>
 
-            {/* Future Planning (New) */}
-            <div className="h-full">
-              <FuturePlanning expansion={results?.expansion} />
+            {/* Column 2: Maintenance Timeline */}
+            <div className="neo-card p-6 flex flex-col overflow-hidden">
+              <h3 className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-6">Optimal Maintenance Schedule</h3>
+              <MaintenanceTimeline
+                windows={results?.maintenance || []}
+              />
+            </div>
+
+            {/* Column 3: Insights & Expansion */}
+            <div className="neo-card p-6 flex flex-col gap-8 justify-center">
+              <AIInsights
+                analysis={results?.analysis}
+                recommendations={results?.recommendations}
+              />
+              <FuturePlanning
+                expansion={results?.expansion}
+              />
             </div>
 
           </div>
 
-          {/* Bottom: AI Insights */}
-          <div className="min-h-[300px]">
-            {results ? (
-              <AIInsights analysis={results.analysis} recommendations={results.recommendations} />
-            ) : (
-              <div className="neo-card w-full h-full p-6 flex flex-col">
-                <h2 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-4">AI Insights & Reasoning</h2>
-                <div className="flex-1 flex flex-col items-center justify-center opacity-40">
-                  <Sparkles className="w-10 h-10 mb-3 text-slate-400" />
-                  <p className="text-sm font-medium text-slate-500">Gemini Engine Ready</p>
-                </div>
-              </div>
-            )}
-          </div>
+        </section>
 
-        </div>
       </div>
+
     </main>
   );
 }

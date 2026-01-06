@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { savitzkyGolaySmooth } from '@/utils/signalProcessing';
+import { savitzkyGolaySmooth, backtestAndOptimize } from '@/utils/signalProcessing';
 import { calculateUnitCommitment, suggestMaintenance, GeneratorUnit } from '@/utils/decisionLogic';
 import { generateForecast } from '@/utils/gemini';
+import { fetchExogenousFactors } from '@/utils/weatherService';
 
 export async function POST(req: NextRequest) {
   try {
@@ -22,34 +23,45 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Invalid historical data" }, { status: 400 });
     }
 
-    // 1. Preprocessing: Smoothing
+    // 1. Adaptive Signal Quality Control
     const rawLoads = historicalData.map((d: any) => d.load);
-    const smoothedLoads = savitzkyGolaySmooth(rawLoads);
+    const { windowSize, degree, lookback } = backtestAndOptimize(rawLoads);
+
+    // 2. Preprocessing: Smoothing with optimized parameters
+    const smoothedLoads = savitzkyGolaySmooth(rawLoads, windowSize, degree);
 
     const processedHistory = historicalData.map((d: any, i: number) => ({
       timestamp: d.timestamp,
       load: smoothedLoads[i],
       originalLoad: d.load
-    }));
+    })).slice(-lookback); // Adaptive Context Window
 
-    // 2. Forecasting (Gemini)
-    // We pass the SMOOTHED data to the AI for better trend detection
-    // Limit to context size if needed, but generateForecast handles slicing.
-    let aiResult;
+    console.log(`[Adaptive Controller] Optimized: Window=${windowSize}, Degree=${degree}, Lookback=${lookback}`);
+
+    // 2. Fetch Exogenous factors (Weather/Environmental)
+    const { location = "Global Grid" } = body;
+    let exogenous;
     try {
-        aiResult = await generateForecast(apiKey, processedHistory, horizon, horizonUnit);
-    } catch (error: any) {
-        return NextResponse.json({ error: "Forecasting failed: " + error.message }, { status: 500 });
+      exogenous = await fetchExogenousFactors(location);
+    } catch (err) {
+      console.warn("Exogenous fetch failed, continuing without weather data.");
     }
 
-    const { forecast, analysis, recommendations, expansion } = aiResult;
+    // 3. Forecasting (Gemini)
+    let aiResult;
+    try {
+      aiResult = await generateForecast(apiKey, processedHistory, horizon, horizonUnit, units, exogenous);
+    } catch (error: any) {
+      return NextResponse.json({ error: "Forecasting failed: " + error.message }, { status: 500 });
+    }
 
-    // 3. Decision Support
+    const { forecast, analysis, recommendations, expansion, maintenance, environmentalImpact } = aiResult;
+
     const forecastLoads = forecast.map(f => f.load);
     const forecastTimestamps = forecast.map(f => f.timestamp);
 
+    // 4. Hybrid Dispatch Logic (Environmental Priority)
     const unitCommitment = calculateUnitCommitment(forecastLoads, forecastTimestamps, units);
-    const maintenance = suggestMaintenance(forecastLoads, forecastTimestamps);
 
     return NextResponse.json({
       processedHistory,
@@ -58,7 +70,8 @@ export async function POST(req: NextRequest) {
       recommendations,
       expansion,
       unitCommitment,
-      maintenance
+      maintenance,
+      environmentalScore: environmentalImpact // AI estimated green score
     });
 
   } catch (error: any) {
