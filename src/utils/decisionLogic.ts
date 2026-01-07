@@ -38,9 +38,9 @@ export interface MaintenanceSuggestion {
 /**
  * Determines which generator units should be ON based on predicted load.
  * Strategy: Environmental Priority Dispatch.
- * 1. Calculate renewable contribution first (Solar/Wind/Hydro).
- * 2. Fill deficit with non-renewables based on marginal cost/emissions.
- * 3. Recommendation: Turn OFF thermal units if Renewables suffice.
+ * 1. Calculate renewable contribution first (Solar, Wind, Hydro).
+ * 2. Fill deficit with Non-Renewable (Thermal, Nuclear) based on Emission Factor first, then Marginal Cost.
+ * 3. Output recommendations for units to turn OFF.
  */
 export function calculateUnitCommitment(
   predictedLoad: number[],
@@ -55,35 +55,51 @@ export function calculateUnitCommitment(
     const unitsOff: string[] = [];
     const target = load + reserveMargin;
 
-    // 1. Filter & Sort
+    // 1. Separate Units
     const renewableUnits = units.filter(u => u.isRenewable);
 
-    // Sort non-renewables: Lower emission -> Lower Cost
+    // Non-Renewable Sort Logic:
+    // Primary: Emission Factor (Ascending - lowest emissions first)
+    // Secondary: Marginal Cost (Ascending - cheapest first)
     const nonRenewableUnits = units.filter(u => !u.isRenewable)
       .sort((a, b) => {
           if (a.emissionFactor !== b.emissionFactor) {
-              return a.emissionFactor - b.emissionFactor; // Greenest first
+              return a.emissionFactor - b.emissionFactor;
           }
-          return a.marginalCost - b.marginalCost; // Then cheapest
+          return a.marginalCost - b.marginalCost;
       });
 
-    // 2. Dispatch Renewables (Must Take / Priority)
+    // 2. Dispatch Renewables (Must Run)
+    // In this simulation, we assume if it's ON in config, it contributes.
+    // Ideally we would scale this by weather factor, but for now we assume 'available capacity'
+    // is what's provided or we assume full capacity for simplicity if 'ON'.
     let renewableCapacity = 0;
     for (const unit of renewableUnits) {
-      // In a real system, we'd check availability factors here (wind speed, sun).
-      // Assuming availability is handled upstream or units represent *available* capacity.
-      currentCapacity += unit.capacityMW;
-      renewableCapacity += unit.capacityMW;
-      unitsOn.push(unit.name);
+      // Logic: Renewables are "Must Take" if status is ON.
+      // If status is OFF manually, we don't use it.
+      if (unit.status === 'ON') {
+          currentCapacity += unit.capacityMW;
+          renewableCapacity += unit.capacityMW;
+          unitsOn.push(unit.name);
+      } else {
+          unitsOff.push(unit.name);
+      }
     }
 
-    // 3. Dispatch Non-Renewables to fill Gap
+    // 3. Dispatch Non-Renewables to fill Deficit
     for (const unit of nonRenewableUnits) {
+      if (unit.status === 'OFF') {
+          // If manually OFF, keep OFF
+          unitsOff.push(unit.name);
+          continue;
+      }
+
       if (currentCapacity < target) {
+        // We need this unit
         currentCapacity += unit.capacityMW;
         unitsOn.push(unit.name);
       } else {
-        // Shed this unit if possible
+        // We have enough power, shed this thermal/nuclear unit
         unitsOff.push(unit.name);
       }
     }
@@ -95,9 +111,6 @@ export function calculateUnitCommitment(
     const environmentalImpact = unitsOn.reduce((acc, name) => {
       const unit = units.find(u => u.name === name);
       if (!unit) return acc;
-      // Estimate actual output: if it's the marginal unit, it might not run full cap.
-      // But for simple commitment logic, we assume dispatch blocks.
-      // Refined: Pro-rate the last unit? No, keep simple block dispatch for MVP.
       return acc + (unit.capacityMW * unit.emissionFactor);
     }, 0);
 
