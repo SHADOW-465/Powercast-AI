@@ -1,6 +1,5 @@
-import { useState } from 'react';
 import FileUpload from './FileUpload';
-import { Settings, Sliders, PlayCircle, Plus, Trash2 } from 'lucide-react';
+import { PlayCircle, Plus, Trash2 } from 'lucide-react';
 import { GeneratorUnit, MaintenanceWindowConfig } from '@/utils/decisionLogic';
 
 interface SystemConfigProps {

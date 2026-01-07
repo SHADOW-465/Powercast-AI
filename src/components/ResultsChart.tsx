@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import {
-  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ReferenceArea
+  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceArea
 } from 'recharts';
 
 interface ResultsChartProps {
@@ -29,7 +29,6 @@ export default function ResultsChart({ history, forecast, horizonUnit, isLoading
     // Heuristic: If we have forecast, show all forecast + small tail of history (e.g. 20% of chart width equivalent)
     // If forecast is length N, we might want N/4 history points prepended.
 
-    const forecastCount = forecast.length;
     // If we have forecast, determine how much history to show by default
     // This doesn't filter the data, but sets the default zoom/view.
     // However, Recharts needs the data array. Let's build the full connected dataset first.
@@ -164,7 +163,7 @@ export default function ResultsChart({ history, forecast, horizonUnit, isLoading
          // We can leave it as 'dataMin' and 'dataMax' and let the user zoom?
          // User explicitly asked for specific initial view.
      }
-  }, [chartData]);
+  }, [chartData, left]);
 
 
   // Filter data based on current zoom or default view

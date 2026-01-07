@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Zap, Info } from "lucide-react";
+import { Zap } from "lucide-react";
 import dynamic from 'next/dynamic';
 import SystemConfig from "@/components/SystemConfig";
 const ResultsChart = dynamic(() => import("@/components/ResultsChart"), { ssr: false });
@@ -54,7 +54,7 @@ export default function Home() {
       } else {
         setResults(data);
       }
-    } catch (e) {
+    } catch {
       alert("Error connecting to server.");
     } finally {
       setLoading(false);
