@@ -62,69 +62,71 @@ export default function Home() {
   };
 
   return (
-    <main className="min-h-screen p-8 flex flex-col gap-8">
+    <main className="h-screen w-full overflow-hidden flex flex-col p-4 gap-4 bg-[#F0F2F5]">
 
       {/* Header Section */}
-      <header className="flex justify-between items-center px-2">
-        <div className="flex items-center gap-6">
-          <div className="w-12 h-12 neo-card flex items-center justify-center text-blue-500 rounded-2xl shadow-lg border border-white/50">
-            <Zap size={24} fill="#3B82F6" />
+      <header className="flex justify-between items-center px-2 py-1 shrink-0">
+        <div className="flex items-center gap-4">
+          <div className="w-10 h-10 neo-card flex items-center justify-center text-blue-500 rounded-2xl shadow-lg border border-white/50">
+            <Zap size={20} fill="#3B82F6" />
           </div>
           <div>
-            <h1 className="text-2xl font-black text-slate-700 tracking-tight uppercase">Powercast-AI Dashboard</h1>
-            <div className="flex items-center gap-2 mt-1">
+            <h1 className="text-xl font-black text-slate-700 tracking-tight uppercase">Powercast AI</h1>
+            <div className="flex items-center gap-2 mt-0.5">
               <div className="neo-status-dot bg-green-500"></div>
-              <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">System Operational</span>
+              <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Enhanced Load Forecasting & Decision Support</span>
             </div>
           </div>
         </div>
 
-        <div className="flex items-center gap-8">
+        <div className="flex items-center gap-4">
           <div className="flex flex-col items-end">
-            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">AI Status</span>
-            <span className="text-xs font-bold text-slate-600 uppercase tracking-wider">{loading ? 'Processing...' : 'Ready'}</span>
-          </div>
-          <div className="neo-btn group relative p-3 rounded-full hover:text-blue-500">
-            <Info size={18} />
-            <div className="absolute top-full right-0 mt-4 neo-card p-4 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50 w-[240px]">
-              <p className="text-[10px] font-bold text-slate-500 leading-relaxed uppercase tracking-widest leading-loose">
-                Next-gen electrical load forecasting using Google Gemini Intelligence.
-              </p>
+            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">System Status</span>
+            <div className="flex items-center gap-2">
+                <div className={`w-2 h-2 rounded-full ${loading ? 'bg-yellow-400 animate-pulse' : 'bg-green-400'}`}></div>
+                <span className="text-[10px] font-bold text-slate-600 uppercase tracking-wider">{loading ? 'Processing...' : 'Ready'}</span>
             </div>
           </div>
         </div>
       </header>
 
       {/* Main Grid Layout */}
-      <div className="flex-1 grid grid-cols-[1fr_2.8fr] gap-8">
+      <div className="flex-1 grid grid-cols-[300px_1fr] gap-4 min-h-0">
 
         {/* Sidebar Configuration */}
-        <aside className="flex flex-col gap-6">
-          <SystemConfig
-            onDataLoaded={setHistoricalData}
-            dataCount={historicalData.length}
-            horizon={horizon}
-            setHorizon={setHorizon}
-            horizonUnit={horizonUnit}
-            setHorizonUnit={setHorizonUnit}
-            lookback={lookback}
-            setLookback={setLookback}
-            units={units}
-            setUnits={setUnits}
-            maintenanceWindows={maintenanceWindows}
-            setMaintenanceWindows={setMaintenanceWindows}
-            location={location}
-            setLocation={setLocation}
-            onRunForecast={handleRunForecast}
-            isLoading={loading}
-          />
+        <aside className="flex flex-col gap-4 overflow-hidden h-full">
+            <div className="flex-1 neo-card p-4 overflow-hidden flex flex-col">
+                <div className="flex items-center justify-between mb-2 shrink-0">
+                     <h2 className="text-[11px] font-black text-slate-600 uppercase tracking-widest">Control & Configuration</h2>
+                </div>
+                <div className="flex-1 min-h-0 overflow-y-auto custom-scrollbar">
+                     <SystemConfig
+                        onDataLoaded={setHistoricalData}
+                        dataCount={historicalData.length}
+                        horizon={horizon}
+                        setHorizon={setHorizon}
+                        horizonUnit={horizonUnit}
+                        setHorizonUnit={setHorizonUnit}
+                        lookback={lookback}
+                        setLookback={setLookback}
+                        units={units}
+                        setUnits={setUnits}
+                        maintenanceWindows={maintenanceWindows}
+                        setMaintenanceWindows={setMaintenanceWindows}
+                        location={location}
+                        setLocation={setLocation}
+                        onRunForecast={handleRunForecast}
+                        isLoading={loading}
+                    />
+                </div>
+            </div>
         </aside>
 
         {/* Visualization & Analysis Area */}
-        <section className="flex flex-col gap-8">
+        <section className="flex flex-col gap-4 overflow-hidden h-full">
 
           {/* Top Chart Area */}
-          <div className="flex-1 min-h-[450px]">
+          <div className="flex-[1.2] neo-card p-1 min-h-0 relative">
             <ResultsChart
               history={historicalData}
               forecast={results?.forecast || []}
@@ -135,34 +137,42 @@ export default function Home() {
           </div>
 
           {/* Bottom Analysis Grid (3-Columns) */}
-          <div className="grid grid-cols-3 gap-8 h-[380px]">
+          <div className="flex-1 grid grid-cols-3 gap-4 min-h-0">
 
             {/* Column 1: Generator Commitment */}
-            <div className="neo-card p-6 flex flex-col overflow-hidden">
-              <h3 className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-6">Generator Commitment</h3>
-              <StatusBoard
-                units={units}
-                commitment={results?.unitCommitment}
-              />
+            <div className="neo-card p-4 flex flex-col min-h-0">
+              <h3 className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-4 shrink-0">Generator Commitment</h3>
+              <div className="flex-1 overflow-y-auto custom-scrollbar">
+                  <StatusBoard
+                    units={units}
+                    commitment={results?.unitCommitment}
+                  />
+              </div>
             </div>
 
             {/* Column 2: Maintenance Timeline */}
-            <div className="neo-card p-6 flex flex-col overflow-hidden">
-              <h3 className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-6">Optimal Maintenance Schedule</h3>
-              <MaintenanceTimeline
-                windows={results?.maintenance || []}
-              />
+            <div className="neo-card p-4 flex flex-col min-h-0">
+              <h3 className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-4 shrink-0">Maintenance Schedule Timeline</h3>
+              <div className="flex-1 overflow-y-auto custom-scrollbar">
+                  <MaintenanceTimeline
+                    windows={results?.maintenance || []}
+                  />
+              </div>
             </div>
 
             {/* Column 3: Insights & Expansion */}
-            <div className="neo-card p-6 flex flex-col gap-8 justify-center">
-              <AIInsights
-                analysis={results?.analysis}
-                recommendations={results?.recommendations}
-              />
-              <FuturePlanning
-                expansion={results?.expansion}
-              />
+            <div className="neo-card p-4 flex flex-col min-h-0">
+                <h3 className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-4 shrink-0">Future Planning & AI Insights</h3>
+                <div className="flex-1 overflow-y-auto custom-scrollbar flex flex-col gap-4">
+                    <FuturePlanning
+                        expansion={results?.expansion}
+                    />
+                    <div className="h-px bg-slate-200 shrink-0"></div>
+                    <AIInsights
+                        analysis={results?.analysis}
+                        recommendations={results?.recommendations}
+                    />
+                </div>
             </div>
 
           </div>
