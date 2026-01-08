@@ -21,12 +21,10 @@ interface SystemConfigProps {
   isLoading: boolean;
 }
 
-export default function SystemConfig(props: SystemConfigProps) {
-  // We can probably show everything in one view or keep tabs if it's too much.
-  // The user said "give all the features inside the scope of the window so i don't have to scroll down each time"
-  // Compacting sections.
+import { useState } from 'react';
 
-  // Let's keep all visible but very compact.
+export default function SystemConfig(props: SystemConfigProps) {
+  const [activeTab, setActiveTab] = useState<'data'|'fleet'|'maint'>('data');
 
   const addUnit = () => {
     const newId = (props.units.length + 1).toString();
@@ -85,151 +83,157 @@ export default function SystemConfig(props: SystemConfigProps) {
 
 
   return (
-    <div className="flex flex-col gap-3 pb-4">
+    <div className="flex flex-col gap-3 h-full">
 
-        {/* Forecast Parameters */}
-        <div className="flex flex-col gap-2">
-            <div className="flex items-center justify-between">
-                 <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Forecast Parameters</span>
-            </div>
-            <div className="neo-card p-3 flex flex-col gap-3">
-                 <div>
-                    <label className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-1.5 block">Prediction Window Length</label>
-                    <input
-                        type="number"
-                        value={props.horizon}
-                        onChange={(e) => props.setHorizon(parseInt(e.target.value))}
-                        className="neo-input w-full font-bold text-slate-600 text-xs p-2"
-                    />
-                 </div>
-                 <div>
-                    <label className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-1.5 block">Time Unit</label>
-                    <div className="flex bg-slate-100 rounded-lg p-1">
-                        {(['hours', 'days', 'years'] as const).map((unit) => (
-                            <button
-                                key={unit}
-                                onClick={() => props.setHorizonUnit(unit)}
-                                className={`flex-1 py-1.5 rounded-md text-[9px] font-black uppercase tracking-widest transition-all ${props.horizonUnit === unit ? 'bg-white shadow-sm text-blue-500' : 'text-slate-400'}`}
-                            >
-                                {unit}
-                            </button>
-                        ))}
-                    </div>
-                 </div>
-                 {/* File Upload Compact */}
-                 <div className="pt-1">
-                     <FileUpload onDataLoaded={props.onDataLoaded} />
-                     <div className="mt-2">
+        {/* Tab Navigation */}
+        <div className="flex gap-1 bg-slate-100 p-1 rounded-lg shrink-0">
+            <button onClick={() => setActiveTab('data')} className={`flex-1 py-1.5 rounded-md text-[9px] font-black uppercase tracking-widest ${activeTab === 'data' ? 'bg-white text-blue-500 shadow-sm' : 'text-slate-400'}`}>Data</button>
+            <button onClick={() => setActiveTab('fleet')} className={`flex-1 py-1.5 rounded-md text-[9px] font-black uppercase tracking-widest ${activeTab === 'fleet' ? 'bg-white text-blue-500 shadow-sm' : 'text-slate-400'}`}>Fleet</button>
+            <button onClick={() => setActiveTab('maint')} className={`flex-1 py-1.5 rounded-md text-[9px] font-black uppercase tracking-widest ${activeTab === 'maint' ? 'bg-white text-blue-500 shadow-sm' : 'text-slate-400'}`}>Maint</button>
+        </div>
+
+        {/* Forecast Parameters (Data Tab) */}
+        {activeTab === 'data' && (
+            <div className="flex flex-col gap-2 flex-1 animate-in fade-in duration-300">
+                <div className="neo-card p-3 flex flex-col gap-3">
+                     <div>
+                        <label className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-1.5 block">Prediction Window</label>
                         <input
-                            type="text"
-                            value={props.location}
-                            onChange={(e) => props.setLocation(e.target.value)}
-                            className="neo-input w-full font-bold text-[10px] text-slate-500 p-2 text-center"
-                            placeholder="Location (City, Country)"
+                            type="number"
+                            value={props.horizon}
+                            onChange={(e) => props.setHorizon(parseInt(e.target.value))}
+                            className="neo-input w-full font-bold text-slate-600 text-xs p-2"
                         />
+                     </div>
+                     <div>
+                        <label className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-1.5 block">Time Unit</label>
+                        <div className="flex bg-slate-100 rounded-lg p-1">
+                            {(['hours', 'days', 'years'] as const).map((unit) => (
+                                <button
+                                    key={unit}
+                                    onClick={() => props.setHorizonUnit(unit)}
+                                    className={`flex-1 py-1.5 rounded-md text-[9px] font-black uppercase tracking-widest transition-all ${props.horizonUnit === unit ? 'bg-white shadow-sm text-blue-500' : 'text-slate-400'}`}
+                                >
+                                    {unit}
+                                </button>
+                            ))}
+                        </div>
+                     </div>
+                     <div className="pt-1">
+                         <FileUpload onDataLoaded={props.onDataLoaded} />
+                         <div className="mt-2">
+                            <input
+                                type="text"
+                                value={props.location}
+                                onChange={(e) => props.setLocation(e.target.value)}
+                                className="neo-input w-full font-bold text-[10px] text-slate-500 p-2 text-center"
+                                placeholder="Location (City, Country)"
+                            />
+                         </div>
+                     </div>
+                </div>
+            </div>
+        )}
+
+        {/* Generator Fleet Configuration (Fleet Tab) */}
+        {activeTab === 'fleet' && (
+            <div className="flex flex-col gap-2 flex-1 min-h-0 animate-in fade-in duration-300">
+                 <div className="neo-card p-3 flex flex-col gap-2 h-full flex-1 min-h-0">
+                     <button onClick={addUnit} className="neo-btn w-full py-2 text-[10px] font-black text-blue-500 uppercase tracking-widest rounded-lg flex items-center justify-center gap-1 hover:text-blue-600 shrink-0">
+                         <Plus size={12} strokeWidth={4} /> Add Unit
+                     </button>
+
+                     <div className="flex flex-col gap-2 overflow-y-auto custom-scrollbar pr-1 flex-1">
+                         {props.units.map((u) => (
+                             <div key={u.id} className="bg-slate-50 border border-slate-100 rounded-lg p-2 flex flex-col gap-2 shrink-0">
+                                 <div className="flex justify-between items-center gap-2">
+                                     <input
+                                        value={u.name}
+                                        onChange={(e) => updateUnit(u.id, 'name', e.target.value)}
+                                        className="bg-transparent text-[10px] font-bold text-slate-700 w-full focus:outline-none focus:border-b border-blue-200"
+                                     />
+                                     <div
+                                        onClick={() => toggleUnitStatus(u.id)}
+                                        className={`cursor-pointer w-8 h-4 rounded-full flex items-center p-0.5 transition-colors ${u.status === 'ON' ? 'bg-green-400 justify-end' : 'bg-slate-300 justify-start'}`}
+                                     >
+                                         <div className="w-3 h-3 bg-white rounded-full shadow-sm"></div>
+                                     </div>
+                                 </div>
+                                 <div className="grid grid-cols-2 gap-2">
+                                     <select
+                                        value={u.type}
+                                        onChange={(e) => updateUnit(u.id, 'type', e.target.value)}
+                                        className="bg-white border border-slate-200 rounded text-[9px] font-bold text-slate-500 p-1"
+                                     >
+                                         <option value="thermal">Thermal</option>
+                                         <option value="solar">Solar</option>
+                                         <option value="wind">Wind</option>
+                                         <option value="hydro">Hydro</option>
+                                         <option value="nuclear">Nuclear</option>
+                                     </select>
+                                     <div className="flex items-center bg-white border border-slate-200 rounded px-1">
+                                         <input
+                                            type="number"
+                                            value={u.capacityMW}
+                                            onChange={(e) => updateUnit(u.id, 'capacityMW', parseInt(e.target.value))}
+                                            className="w-full text-[9px] font-bold text-slate-600 text-right p-1 focus:outline-none"
+                                         />
+                                         <span className="text-[8px] font-bold text-slate-400 ml-1">MW</span>
+                                     </div>
+                                 </div>
+                             </div>
+                         ))}
                      </div>
                  </div>
             </div>
-        </div>
+        )}
 
-        {/* Generator Fleet Configuration */}
-        <div className="flex flex-col gap-2 flex-1 min-h-0">
-             <div className="flex items-center justify-between">
-                 <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Generator Fleet Configuration</span>
-             </div>
-             <div className="neo-card p-3 flex flex-col gap-2 min-h-[150px]">
-                 <button onClick={addUnit} className="neo-btn w-full py-2 text-[10px] font-black text-blue-500 uppercase tracking-widest rounded-lg flex items-center justify-center gap-1 hover:text-blue-600">
-                     <Plus size={12} strokeWidth={4} /> Add Unit
-                 </button>
+        {/* Maintenance Scheduling (Maint Tab) */}
+        {activeTab === 'maint' && (
+            <div className="flex flex-col gap-2 flex-1 min-h-0 animate-in fade-in duration-300">
+                 <div className="neo-card p-3 flex flex-col gap-2 h-full flex-1 min-h-0">
+                    <button onClick={addMaintenance} className="neo-btn w-full py-2 text-[10px] font-black text-blue-500 uppercase tracking-widest rounded-lg flex items-center justify-center gap-1 hover:text-blue-600 shrink-0">
+                        <Plus size={12} strokeWidth={4} /> Add Window
+                    </button>
 
-                 <div className="flex flex-col gap-2 overflow-y-auto max-h-[180px] custom-scrollbar pr-1">
-                     {props.units.map((u) => (
-                         <div key={u.id} className="bg-slate-50 border border-slate-100 rounded-lg p-2 flex flex-col gap-2">
-                             <div className="flex justify-between items-center gap-2">
-                                 <input
-                                    value={u.name}
-                                    onChange={(e) => updateUnit(u.id, 'name', e.target.value)}
-                                    className="bg-transparent text-[10px] font-bold text-slate-700 w-full focus:outline-none focus:border-b border-blue-200"
-                                 />
-                                 <div
-                                    onClick={() => toggleUnitStatus(u.id)}
-                                    className={`cursor-pointer w-8 h-4 rounded-full flex items-center p-0.5 transition-colors ${u.status === 'ON' ? 'bg-green-400 justify-end' : 'bg-slate-300 justify-start'}`}
-                                 >
-                                     <div className="w-3 h-3 bg-white rounded-full shadow-sm"></div>
-                                 </div>
-                             </div>
-                             <div className="grid grid-cols-2 gap-2">
-                                 <select
-                                    value={u.type}
-                                    onChange={(e) => updateUnit(u.id, 'type', e.target.value)}
-                                    className="bg-white border border-slate-200 rounded text-[9px] font-bold text-slate-500 p-1"
-                                 >
-                                     <option value="thermal">Thermal</option>
-                                     <option value="solar">Solar</option>
-                                     <option value="wind">Wind</option>
-                                     <option value="hydro">Hydro</option>
-                                     <option value="nuclear">Nuclear</option>
-                                 </select>
-                                 <div className="flex items-center bg-white border border-slate-200 rounded px-1">
-                                     <input
-                                        type="number"
-                                        value={u.capacityMW}
-                                        onChange={(e) => updateUnit(u.id, 'capacityMW', parseInt(e.target.value))}
-                                        className="w-full text-[9px] font-bold text-slate-600 text-right p-1 focus:outline-none"
-                                     />
-                                     <span className="text-[8px] font-bold text-slate-400 ml-1">MW</span>
-                                 </div>
-                             </div>
-                         </div>
-                     ))}
-                 </div>
-             </div>
-        </div>
-
-        {/* Maintenance Scheduling */}
-        <div className="flex flex-col gap-2">
-             <div className="flex items-center justify-between">
-                 <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Maintenance Scheduling</span>
-                 <button onClick={addMaintenance} className="text-[9px] font-bold text-blue-500 hover:underline flex items-center gap-1">
-                    <Plus size={10} /> Add Window
-                 </button>
-             </div>
-             <div className="neo-card p-3 flex flex-col gap-2 max-h-[150px] overflow-y-auto custom-scrollbar">
-                {props.maintenanceWindows.length === 0 && (
-                    <div className="text-center py-2 text-[9px] font-bold text-slate-300 uppercase">No Manual Schedule</div>
-                )}
-                {props.maintenanceWindows.map((w) => (
-                    <div key={w.id} className="flex items-center gap-2 bg-slate-50 p-2 rounded-lg border border-slate-100">
-                        <div className="grid grid-cols-2 gap-1 flex-1">
-                            <input
-                                type="time"
-                                value={w.start}
-                                onChange={(e) => updateMaintenance(w.id, 'start', e.target.value)}
-                                className="bg-white border border-slate-200 rounded text-[9px] text-slate-600 text-center p-1"
-                            />
-                            <input
-                                type="time"
-                                value={w.end}
-                                onChange={(e) => updateMaintenance(w.id, 'end', e.target.value)}
-                                className="bg-white border border-slate-200 rounded text-[9px] text-slate-600 text-center p-1"
-                            />
-                        </div>
-                        <select
-                            value={w.reason}
-                            onChange={(e) => updateMaintenance(w.id, 'reason', e.target.value)}
-                             className="bg-white border border-slate-200 rounded text-[9px] text-slate-600 p-1 w-20"
-                        >
-                            <option value="Low Demand">Low Demand</option>
-                            <option value="Repair">Repair</option>
-                            <option value="Inspection">Inspection</option>
-                        </select>
-                        <button onClick={() => removeMaintenance(w.id)} className="text-slate-400 hover:text-red-400">
-                            <Trash2 size={12} />
-                        </button>
+                    <div className="flex flex-col gap-2 overflow-y-auto custom-scrollbar pr-1 flex-1">
+                        {props.maintenanceWindows.length === 0 && (
+                            <div className="text-center py-2 text-[9px] font-bold text-slate-300 uppercase">No Manual Schedule</div>
+                        )}
+                        {props.maintenanceWindows.map((w) => (
+                            <div key={w.id} className="flex items-center gap-2 bg-slate-50 p-2 rounded-lg border border-slate-100 shrink-0">
+                                <div className="grid grid-cols-2 gap-1 flex-1">
+                                    <input
+                                        type="time"
+                                        value={w.start}
+                                        onChange={(e) => updateMaintenance(w.id, 'start', e.target.value)}
+                                        className="bg-white border border-slate-200 rounded text-[9px] text-slate-600 text-center p-1"
+                                    />
+                                    <input
+                                        type="time"
+                                        value={w.end}
+                                        onChange={(e) => updateMaintenance(w.id, 'end', e.target.value)}
+                                        className="bg-white border border-slate-200 rounded text-[9px] text-slate-600 text-center p-1"
+                                    />
+                                </div>
+                                <select
+                                    value={w.reason}
+                                    onChange={(e) => updateMaintenance(w.id, 'reason', e.target.value)}
+                                    className="bg-white border border-slate-200 rounded text-[9px] text-slate-600 p-1 w-20"
+                                >
+                                    <option value="Low Demand">Low Demand</option>
+                                    <option value="Repair">Repair</option>
+                                    <option value="Inspection">Inspection</option>
+                                </select>
+                                <button onClick={() => removeMaintenance(w.id)} className="text-slate-400 hover:text-red-400">
+                                    <Trash2 size={12} />
+                                </button>
+                            </div>
+                        ))}
                     </div>
-                ))}
-             </div>
-        </div>
+                 </div>
+            </div>
+        )}
 
         {/* Main Action Button */}
         <button

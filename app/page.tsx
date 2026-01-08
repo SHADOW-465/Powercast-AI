@@ -35,13 +35,31 @@ export default function Home() {
     setResults(null);
 
     try {
+      // Calculate steps and frequency based on unit
+      // User wants detailed forecast.
+      // Hours -> Hourly steps.
+      // Days -> Hourly steps (24 * days).
+      // Years -> Monthly steps (12 * years).
+
+      let steps = horizon;
+      let frequency = 'hourly';
+
+      if (horizonUnit === 'days') {
+          steps = horizon * 24;
+          frequency = 'hourly';
+      } else if (horizonUnit === 'years') {
+          steps = horizon * 12;
+          frequency = 'monthly';
+      }
+
       const resp = await fetch('/api/forecast', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           historicalData,
-          horizon,
-          horizonUnit,
+          forecastHorizon: steps, // Pass calculated steps
+          frequency,              // Pass frequency context
+          horizonUnit,            // Keep for reference if needed
           units,
           location,
           maintenanceWindows
