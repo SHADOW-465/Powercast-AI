@@ -11,6 +11,7 @@ export async function POST(req: NextRequest) {
       historicalData,
       timestamps,
       forecastHorizon = 24,
+      frequency = 'hourly', // 'hourly' | 'monthly'
       location = "New York, NY", // Default location
       units
     } = body;
@@ -49,11 +50,18 @@ export async function POST(req: NextRequest) {
     const generatorFleet = units || [];
 
     // Generate future timestamps if not present
-    // Simple hourly increment
     const futureTimestamps = [];
-    const lastTime = timestamps ? new Date(timestamps[timestamps.length-1]).getTime() : Date.now();
+    const lastTime = timestamps ? new Date(timestamps[timestamps.length-1]) : new Date();
+
     for (let i = 1; i <= forecastResult.forecast.length; i++) {
-        futureTimestamps.push(new Date(lastTime + i * 3600000).toISOString());
+        const nextTime = new Date(lastTime);
+        if (frequency === 'monthly') {
+            nextTime.setMonth(nextTime.getMonth() + i);
+        } else {
+            // Default hourly
+            nextTime.setTime(nextTime.getTime() + i * 3600000);
+        }
+        futureTimestamps.push(nextTime.toISOString());
     }
 
     const unitCommitment = calculateUnitCommitment(

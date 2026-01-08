@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import {
-  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ReferenceArea
+  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceArea
 } from 'recharts';
 
 interface ResultsChartProps {
@@ -29,7 +29,6 @@ export default function ResultsChart({ history, forecast, horizonUnit, isLoading
     // Heuristic: If we have forecast, show all forecast + small tail of history (e.g. 20% of chart width equivalent)
     // If forecast is length N, we might want N/4 history points prepended.
 
-    const forecastCount = forecast.length;
     // If we have forecast, determine how much history to show by default
     // This doesn't filter the data, but sets the default zoom/view.
     // However, Recharts needs the data array. Let's build the full connected dataset first.
@@ -65,35 +64,34 @@ export default function ResultsChart({ history, forecast, horizonUnit, isLoading
         let label = `+${index + 1}`;
 
         // Date Projection
+        // Since API now returns correct steps based on Horizon/Frequency, we can just increment normally
+        // OR ideally the API should return timestamps? The API returns 'forecast' as number[] but we don't get the timestamps back in the client 'results' object easily unless we look at the 'unitCommitment' or similar which has timestamps.
+        // Wait, 'results' object has 'unitCommitment' which has 'timestamp'.
+        // But here we only receive 'forecast' (number[]).
+        // It's safer to reproduce the logic or ask parent to pass timestamps.
+        // For now, let's reproduce the logic matching the API.
+
         const currentDate = new Date(lastHistoryDate);
-        if (horizonUnit === 'hours') {
-            currentDate.setHours(currentDate.getHours() + (index + 1));
-            // Format: HH:mm
-            label = currentDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-        } else if (horizonUnit === 'days') {
-            currentDate.setDate(currentDate.getDate() + (index + 1));
-            // Format: MMM dd
-            label = currentDate.toLocaleDateString([], { month: 'short', day: 'numeric' });
-        } else if (horizonUnit === 'years') {
-            // For years, we probably mean "forecast over a year" so the steps might be days or months?
-            // If the user selected "Years" as unit and "1" as horizon, we probably get 12 data points (months)?
-            // Or 365 points? The API usually returns what we ask.
-            // Assuming the forecast array corresponds to the "steps" of the horizon.
 
-            // If the user said "Forecast for 1 Year" and we get e.g. 12 points (monthly), or 8760 points (hourly).
-            // Let's assume the API handles the resolution.
-            // If the unit is 'years', we assume the steps are significant.
-            // Let's increment based on a sensible step. If we just have indices, we project.
+        if (horizonUnit === 'years') {
+             // API uses monthly steps for years
+             currentDate.setMonth(currentDate.getMonth() + (index + 1));
+             label = currentDate.toLocaleDateString([], { month: 'short', year: 'numeric' });
+        } else {
+             // API uses hourly steps for 'hours' and 'days'
+             // If unit is 'days', we requested horizon * 24 steps (hourly).
+             // So we increment by HOURS.
+             currentDate.setHours(currentDate.getHours() + (index + 1));
 
-            // Simple approach: If unit is 'years', maybe the steps are months?
-            // Let's assume the user meant the *duration* is years, but the resolution is monthly/daily.
-            // But if the backend simply steps by 1 'unit', then 1 year step is huge.
-            // Let's assume standard monthly projection if count is low (~12), or daily if (~365).
-
-            // Fallback: If 'years' is selected, simply increment year? No, that's too coarse.
-            // Let's assume standard date increment.
-            currentDate.setMonth(currentDate.getMonth() + (index + 1)); // Assumption: Steps are months for 'Year' view
-            label = currentDate.toLocaleDateString([], { month: 'short', year: 'numeric' });
+             if (horizonUnit === 'days') {
+                 // Format: MMM dd HH:mm if hourly resolution
+                 // If we have many points, maybe just Date?
+                 // But hourly resolution means we have 24 points per day.
+                 label = currentDate.toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute:'2-digit' });
+             } else {
+                 // Unit is hours
+                 label = currentDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+             }
         }
 
         return {
@@ -164,7 +162,7 @@ export default function ResultsChart({ history, forecast, horizonUnit, isLoading
          // We can leave it as 'dataMin' and 'dataMax' and let the user zoom?
          // User explicitly asked for specific initial view.
      }
-  }, [chartData]);
+  }, [chartData, left]);
 
 
   // Filter data based on current zoom or default view

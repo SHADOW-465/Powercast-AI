@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Zap, Info } from "lucide-react";
+import { Zap } from "lucide-react";
 import dynamic from 'next/dynamic';
 import SystemConfig from "@/components/SystemConfig";
 const ResultsChart = dynamic(() => import("@/components/ResultsChart"), { ssr: false });
@@ -35,13 +35,31 @@ export default function Home() {
     setResults(null);
 
     try {
+      // Calculate steps and frequency based on unit
+      // User wants detailed forecast.
+      // Hours -> Hourly steps.
+      // Days -> Hourly steps (24 * days).
+      // Years -> Monthly steps (12 * years).
+
+      let steps = horizon;
+      let frequency = 'hourly';
+
+      if (horizonUnit === 'days') {
+          steps = horizon * 24;
+          frequency = 'hourly';
+      } else if (horizonUnit === 'years') {
+          steps = horizon * 12;
+          frequency = 'monthly';
+      }
+
       const resp = await fetch('/api/forecast', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           historicalData,
-          horizon,
-          horizonUnit,
+          forecastHorizon: steps, // Pass calculated steps
+          frequency,              // Pass frequency context
+          horizonUnit,            // Keep for reference if needed
           units,
           location,
           maintenanceWindows
@@ -54,7 +72,7 @@ export default function Home() {
       } else {
         setResults(data);
       }
-    } catch (e) {
+    } catch {
       alert("Error connecting to server.");
     } finally {
       setLoading(false);
